@@ -35,7 +35,6 @@ export const GCS_OPTIONS = {
 
 export const BOTTOM_NAV_SECTIONS = [
   { id: 'calculators', name: 'Scoring', icon: <Calculator size={24} /> },
-  { id: 'vitals', name: 'Sepsis', icon: <Activity size={24} /> },
   { id: 'exam', name: 'Exam', icon: <Eye size={24} /> },
   { id: 'tasks', name: 'Tasks', icon: <AlertCircle size={24} /> },
   { id: 'summary', name: 'AI Consult', icon: <Brain size={24} /> },

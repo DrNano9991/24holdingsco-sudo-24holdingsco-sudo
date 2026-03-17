@@ -1,3 +1,32 @@
+export type AgeGroup = 'Adult' | 'Pediatric' | 'Neonate';
+
+export enum Type {
+  TYPE_UNSPECIFIED = "TYPE_UNSPECIFIED",
+  STRING = "STRING",
+  NUMBER = "NUMBER",
+  INTEGER = "INTEGER",
+  BOOLEAN = "BOOLEAN",
+  ARRAY = "ARRAY",
+  OBJECT = "OBJECT",
+  NULL = "NULL",
+}
+
+export interface SavedPatient {
+  id: string;
+  name: string;
+  date: string;
+  ageGroup: AgeGroup;
+  data: PatientData;
+}
+
+export interface PEWSState {
+  behavior: number; // 0-3
+  cardiovascular: number; // 0-3
+  respiratory: number; // 0-3
+  nebulizer: boolean;
+  persistentVomiting: boolean;
+}
+
 export interface GCSState {
   eye: number;
   verbal: number;
@@ -56,6 +85,25 @@ export interface SurgicalState {
   duration: string;
 }
 
+export interface CURB65State {
+  confusion: boolean;
+  urea: boolean;
+  rr: boolean;
+  bp: boolean;
+  age: boolean;
+}
+
+export interface CHADS2VAScState {
+  chf: boolean;
+  htn: boolean;
+  age75: boolean;
+  dm: boolean;
+  stroke: boolean;
+  vascular: boolean;
+  age65: boolean;
+  female: boolean;
+}
+
 export interface PatientData {
   gcs: GCSState;
   sirs: SIRSState;
@@ -64,16 +112,9 @@ export interface PatientData {
   liver: LiverState;
   exam: ExamState;
   surgery: SurgicalState;
-  curb65: {
-    confusion: boolean;
-    urea: boolean;
-    rr: boolean;
-    bp: boolean;
-    age: boolean;
-  };
-  anthro: {
-    waist: number | '';
-    height: number | '';
-  };
+  curb65: CURB65State;
+  chads: CHADS2VAScState;
+  pews: PEWSState;
+  ageGroup: AgeGroup;
   notes: string;
 }

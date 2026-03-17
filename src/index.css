@@ -16,11 +16,53 @@
   --med-info: #3b82f6;
   --safe-area-inset-top: env(safe-area-inset-top);
   --safe-area-inset-bottom: env(safe-area-inset-bottom);
+  
+  /* Modern Tech Data Variables */
+  --primary: #0891b2;
+  --accent: #e11d48;
+  --bg-light: #f8fafc;
+  --card-bg: rgba(255, 255, 255, 0.7);
+  --text-dark: #0f172a;
+}
+
+body.eye-comfort {
+  --med-bg: #fffbf0;
+  --med-card: rgba(255, 255, 255, 0.9);
+  --med-border: rgba(0, 0, 0, 0.1);
+  color: #1e293b !important;
+}
+
+body.eye-comfort .text-slate-900, 
+body.eye-comfort .text-slate-800, 
+body.eye-comfort .text-slate-700 { color: #0f172a !important; }
+
+body.eye-comfort .bg-slate-50, 
+body.eye-comfort .bg-slate-100, 
+body.eye-comfort .bg-slate-200 { background-color: #f8fafc !important; }
+
+body.eye-comfort input, 
+body.eye-comfort select, 
+body.eye-comfort textarea {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+body.eye-comfort .app-header, 
+body.eye-comfort .bottom-nav {
+  background: rgba(255, 251, 240, 0.9);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+body.night-mode {
+  --med-bg: #000000;
+  --med-card: rgba(15, 15, 15, 0.9);
+  --med-border: rgba(255, 255, 255, 0.05);
 }
 
 body {
   background-color: var(--med-bg);
-  color: #e2e8f0;
+  color: #1e293b;
   overflow-x: hidden;
   transition: background-color 0.5s ease;
   font-family: var(--font-sans);
@@ -34,11 +76,11 @@ h1, h2, h3, .header-title {
 /* --- HIGH-TECH MEDICAL UI --- */
 
 .material-card {
-  background: var(--med-card);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--med-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -48,17 +90,17 @@ h1, h2, h3, .header-title {
 }
 
 .app-header {
-  background: rgba(10, 15, 29, 0.8);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--med-border);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .bottom-nav {
-  background: rgba(10, 15, 29, 0.9);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--med-border);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
   padding-bottom: var(--safe-area-inset-bottom);
 }
@@ -66,9 +108,9 @@ h1, h2, h3, .header-title {
 /* --- INPUTS & BUTTONS --- */
 
 input, select, textarea {
-  background: rgba(0, 0, 0, 0.2) !important;
-  border: 1px solid var(--med-border) !important;
-  color: #f8fafc !important;
+  background: rgba(255, 255, 255, 0.5) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  color: #0f172a !important;
   border-radius: 12px !important;
   transition: all 0.2s ease !important;
 }
@@ -112,12 +154,126 @@ input:focus, select:focus, textarea:focus {
   animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; 
 }
 
-.bg-slate-50, .bg-slate-100, .bg-slate-200 {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+.bg-slate-50 { background-color: #f8fafc !important; }
+.bg-slate-100 { background-color: #f1f5f9 !important; }
+.bg-slate-200 { background-color: #e2e8f0 !important; }
+
+.text-slate-900, .text-slate-800, .text-slate-700 { color: #0f172a; }
+.text-slate-600 { color: #334155; }
+.text-slate-500 { color: #475569; }
+.text-slate-400 { color: #64748b; }
+
+.dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 { color: #ffffff; }
+
+/* --- MODERN TECH DATA THEME --- */
+
+.material-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.screen-fx {
+  background: linear-gradient(rgba(255, 255, 255, 0.5) 50%, rgba(200, 200, 200, 0.1) 50%);
+  background-size: 100% 4px;
+  opacity: 0.15;
+  mix-blend-mode: multiply;
 }
 
-.text-slate-900, .text-slate-800, .text-slate-700 { color: #f1f5f9 !important; }
-.text-slate-500, .text-slate-400 { color: #94a3b8 !important; }
+.vignette {
+  background: radial-gradient(circle, transparent 60%, rgba(200, 200, 200, 0.2) 100%);
+}
+
+.label-tech {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--med-accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.5s ease;
+}
+
+.label-tech::before {
+  content: '';
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.meter-container {
+  width: 100%;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.08);
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.meter-value {
+  height: 100%;
+  background: var(--med-accent);
+  box-shadow: 0 0 8px var(--med-accent);
+  width: 0%;
+  transition: width 2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.5s ease;
+}
+
+.ecg-glow {
+  filter: drop-shadow(0 0 5px var(--med-accent));
+  transition: filter 0.5s ease;
+}
+
+.status-badge {
+  padding: 1px 4px;
+  font-size: 8px;
+  font-weight: 900;
+  border-radius: 4px;
+  transition: all 0.5s ease;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--med-accent);
+  color: var(--med-accent);
+}
+
+.heart-outer {
+  width: 64px;
+  height: 64px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0,0,0,0.05);
+  z-index: 10;
+}
+
+.heart-icon-google {
+  font-size: 42px !important;
+  color: #e11d48;
+  user-select: none;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+}
+
+.color-transition {
+  transition: color 0.8s ease, border-color 0.8s ease, background 0.8s ease;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(15px) saturate(180%);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+  pointer-events: auto;
+  border-radius: 8px;
+  transition: border-color 0.8s ease, box-shadow 0.8s ease;
+  color: var(--text-dark);
+}
 
 /* --- SCROLLBARS --- */
 ::-webkit-scrollbar { width: 4px; }
