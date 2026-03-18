@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Circle, Plus, Trash2, User, UserPlus, ClipboardList, CheckCircle, Clock } from 'lucide-react';
+import { CheckCircle2, Circle, Plus, Trash2, User, UserPlus, ClipboardList, CheckCircle, Clock, Printer } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Task, SavedPatient } from '../types';
 import { speechService } from '../services/speechService';
@@ -55,6 +55,127 @@ const TaskList: React.FC = () => {
       speechService.speak(`Task ${task.text} deleted.`);
     }
     setTasks(tasks.filter(t => t.id !== id));
+  };
+
+  const printPatientReport = (patientId: string) => {
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const data = patient.data;
+    
+    const html = `
+      <html>
+        <head>
+          <title>Clinical Report - ${patient.name}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+            .header { border-bottom: 4px solid #dc2626; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .header h1 { margin: 0; font-size: 32px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; }
+            .header p { margin: 5px 0 0; font-weight: 700; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; }
+            .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 12px; }
+            .meta-item { display: flex; flex-direction: column; }
+            .meta-label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+            .meta-value { font-size: 16px; font-weight: 700; }
+            .section { margin-bottom: 25px; }
+            .section-title { font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #dc2626; border-bottom: 1px solid #fee2e2; padding-bottom: 5px; margin-bottom: 15px; }
+            .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+            .card { background: white; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; }
+            .card-label { font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+            .card-value { font-size: 14px; font-weight: 700; }
+            .notes { background: #fff7ed; border: 1px solid #ffedd5; padding: 15px; border-radius: 12px; font-style: italic; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1>AI MEDICA <span style="color: #dc2626">UG</span></h1>
+              <p>Clinical Decision Support System</p>
+            </div>
+            <div style="text-align: right">
+              <div style="font-weight: 900; font-size: 14px;">PATIENT RECORD</div>
+              <div style="font-size: 10px; color: #64748b;">Generated: ${new Date().toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div class="meta">
+            <div class="meta-item">
+              <span class="meta-label">Patient Name</span>
+              <span class="meta-value">${patient.name}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Serial Number</span>
+              <span class="meta-value" style="color: #dc2626">${patient.serialNumber || 'N/A'}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Age Group</span>
+              <span class="meta-value">${patient.ageGroup}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Registration Date</span>
+              <span class="meta-value">${new Date(patient.date).toLocaleDateString()}</span>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Vital Signs & Scores</div>
+            <div class="grid">
+              <div class="card">
+                <div class="card-label">GCS Total</div>
+                <div class="card-value">${data.gcs.eye + data.gcs.verbal + data.gcs.motor}/15</div>
+              </div>
+              <div class="card">
+                <div class="card-label">MEWS Score</div>
+                <div class="card-value">${data.mews.sbp ? 'Calculated' : 'N/A'}</div>
+              </div>
+              <div class="card">
+                <div class="card-label">Temperature</div>
+                <div class="card-value">${data.mews.temp}°C</div>
+              </div>
+              <div class="card">
+                <div class="card-label">Heart Rate</div>
+                <div class="card-value">${data.mews.hr} bpm</div>
+              </div>
+              <div class="card">
+                <div class="card-label">Resp Rate</div>
+                <div class="card-value">${data.mews.rr} /min</div>
+              </div>
+              <div class="card">
+                <div class="card-label">Systolic BP</div>
+                <div class="card-value">${data.mews.sbp} mmHg</div>
+              </div>
+            </div>
+          </div>
+
+          ${data.notes ? `
+            <div class="section">
+              <div class="section-title">Clinical Notes</div>
+              <div class="notes">${data.notes}</div>
+            </div>
+          ` : ''}
+
+          <div style="margin-top: 50px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 10px; color: #94a3b8; text-align: center;">
+            This report was generated by AI Medica UG. Clinical judgment is required for final decisions.
+          </div>
+
+          <script>
+            window.onload = () => {
+              window.print();
+              // window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const filteredTasks = tasks.filter(t => {
@@ -175,12 +296,23 @@ const TaskList: React.FC = () => {
               </div>
             </div>
 
-            <button 
-              onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} 
-              className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
-            >
-              <Trash2 size={18} />
-            </button>
+            <div className="flex items-center gap-2">
+              {task.patientId && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); printPatientReport(task.patientId!); }} 
+                  className="p-3 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all"
+                  title="Print Patient Report"
+                >
+                  <Printer size={18} />
+                </button>
+              )}
+              <button 
+                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }} 
+                className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
           </div>
         ))}
 

@@ -49,10 +49,38 @@ const CombinedCalculators: React.FC<Props> = ({
 
   const ariscatRisk = getAriscatRisk(ariscatScore);
 
+  const isMewsCritical = ScoringEngine.calculateMEWS(mews) >= 5;
+  const isPewsCritical = ScoringEngine.calculatePEWS(pews) >= 5;
+  const isVitalsCritical = vitalsClass.hr.severity === 'Critical' || vitalsClass.rr.severity === 'Critical' || vitalsClass.sbp.severity === 'Critical';
+  const isAnyCritical = (ageGroup === 'Adult' && (isMewsCritical || isVitalsCritical)) || (ageGroup !== 'Adult' && isPewsCritical);
+
   // --- CHANGE DETECTION NOTIFICATIONS ---
   const prevGcs = useRef(gcsTotal);
   const prevMews = useRef(ScoringEngine.calculateMEWS(mews));
   const prevPews = useRef(ScoringEngine.calculatePEWS(pews));
+  const prevCritical = useRef(false);
+
+  useEffect(() => {
+    if (isAnyCritical && !prevCritical.current) {
+      speechService.notifyChange('CRITICAL ALERT', 'Immediate clinical intervention required. Vital signs have crossed critical thresholds.');
+      // Simple auditory beep using Web Audio API
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.5);
+      } catch (e) {
+        console.error('Audio alert failed', e);
+      }
+    }
+    prevCritical.current = isAnyCritical;
+  }, [isAnyCritical]);
 
   useEffect(() => {
     if (gcsTotal !== prevGcs.current) {
@@ -78,7 +106,27 @@ const CombinedCalculators: React.FC<Props> = ({
   }, [pews, ageGroup]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-6">
+      {isAnyCritical && (
+        <div className="bg-red-600 text-white p-4 rounded-2xl shadow-xl shadow-red-600/20 animate-pulse flex items-center justify-between border-2 border-red-400">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-full">
+              <AlertTriangle size={24} className="animate-bounce" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black uppercase tracking-tighter leading-none">Critical Alert</h3>
+              <p className="text-[10px] font-bold opacity-90 uppercase tracking-widest mt-1">Immediate Medical Review Required</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-black leading-none">
+              {ageGroup === 'Adult' ? `MEWS: ${ScoringEngine.calculateMEWS(mews)}` : `PEWS: ${ScoringEngine.calculatePEWS(pews)}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* GCS Calculator */}
       <ScoreCard title="GCS" subtitle="Glasgow Coma Scale" icon={<Brain size={20} />} score={gcsTotal} color="indigo">
         <div className="space-y-4">
@@ -112,8 +160,20 @@ const CombinedCalculators: React.FC<Props> = ({
       </ScoreCard>
 
       {/* MEWS Calculator */}
-      <ScoreCard title="MEWS" subtitle="Modified Early Warning" icon={<Zap size={20} />} score={ScoringEngine.calculateMEWS(mews)} color="orange">
+      <ScoreCard 
+        title="MEWS" 
+        subtitle="Modified Early Warning" 
+        icon={<Zap size={20} />} 
+        score={ScoringEngine.calculateMEWS(mews)} 
+        color={isMewsCritical || isVitalsCritical ? "red" : "orange"}
+      >
         <div className="space-y-4">
+          {(isMewsCritical || isVitalsCritical) && (
+            <div className="bg-red-500/10 text-red-600 p-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-red-500/20">
+              <AlertTriangle size={12} />
+              Critical Deviation Detected
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="flex items-center gap-1 mb-1">
@@ -239,8 +299,20 @@ const CombinedCalculators: React.FC<Props> = ({
       </ScoreCard>
 
       {/* PEWS Calculator */}
-      <ScoreCard title="PEWS" subtitle="Pediatric Early Warning" icon={<Baby size={20} />} score={ScoringEngine.calculatePEWS(pews)} color="pink">
+      <ScoreCard 
+        title="PEWS" 
+        subtitle="Pediatric Early Warning" 
+        icon={<Baby size={20} />} 
+        score={ScoringEngine.calculatePEWS(pews)} 
+        color={isPewsCritical ? "red" : "pink"}
+      >
         <div className="space-y-4">
+          {isPewsCritical && (
+            <div className="bg-red-500/10 text-red-600 p-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-red-500/20">
+              <AlertTriangle size={12} />
+              Critical Pediatric Warning
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-2">
             {(['behavior', 'cardiovascular', 'respiratory'] as const).map((type) => (
               <div key={type}>
@@ -342,6 +414,7 @@ const CombinedCalculators: React.FC<Props> = ({
           </div>
         </div>
       </ScoreCard>
+      </div>
     </div>
   );
 };

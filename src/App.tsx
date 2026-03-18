@@ -3,7 +3,7 @@ import {
   Activity, Brain, Wind, Stethoscope, ShieldCheck, Moon, Sun, Calculator, AlertCircle, Eye, Zap,
   Volume2, VolumeX, Info, X
 } from 'lucide-react';
-import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, SurgicalState, PatientData, SavedPatient } from './types';
+import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, SurgicalState, PatientData, SavedPatient, Task } from './types';
 import { BOTTOM_NAV_SECTIONS } from './constants';
 import ScoreCard from './components/ScoreCard';
 import CombinedCalculators from './components/CombinedCalculators';
@@ -100,6 +100,7 @@ const App: React.FC = () => {
 
   // --- SAVED PATIENTS ---
   const [savedPatients, setSavedPatients] = useLocalStorage<SavedPatient[]>('ai-medica-saved-patients', []);
+  const [tasks, setTasks] = useLocalStorage<Task[]>('ai-medica-tasks', []);
   const [patientName, setPatientName] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
 
@@ -212,20 +213,63 @@ const App: React.FC = () => {
 
   const savePatient = () => {
     if (!patientName) return;
+    
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+    const randomId = Math.floor(1000 + Math.random() * 9000);
+    const serialNumber = `MED-${dateStr}-${randomId}`;
+    
     const newPatient: SavedPatient = {
       id: Date.now().toString(),
+      serialNumber,
       name: patientName,
-      date: new Date().toISOString(),
+      date: now.toISOString(),
       ageGroup,
       data: {
         ageGroup, gcs, mews, sirs, qsofa, pews, notes,
-        liver, exam, surgery, curb65, anthro
-      } as any
+        liver, exam, surgery, curb65, wellsPE, chads, anthro
+      } as any,
+      aiInsight: aiInsight
     };
+    
+    // Create tasks from AI insights
+    const newTasks: Task[] = [];
+    if (aiInsight) {
+      if (aiInsight.actions) {
+        aiInsight.actions.forEach((action: string) => {
+          newTasks.push({
+            id: `task-${Date.now()}-${Math.random()}`,
+            text: `Action: ${action}`,
+            completed: false,
+            priority: 'medium',
+            patientId: newPatient.id,
+            patientName: newPatient.name,
+            createdAt: now.toISOString()
+          });
+        });
+      }
+      if (aiInsight.diagnostics) {
+        aiInsight.diagnostics.forEach((diag: string) => {
+          newTasks.push({
+            id: `task-${Date.now()}-${Math.random()}`,
+            text: `Investigation: ${diag}`,
+            completed: false,
+            priority: 'high',
+            patientId: newPatient.id,
+            patientName: newPatient.name,
+            createdAt: now.toISOString()
+          });
+        });
+      }
+    }
+
     setSavedPatients([newPatient, ...savedPatients]);
+    setTasks([...newTasks, ...tasks]);
     setPatientName('');
     setShowSaveModal(false);
-    speechService.notifyChange('Patient Registration', `Patient ${newPatient.name} has been successfully registered and saved to the database.`);
+    
+    const speechMsg = `Patient ${newPatient.name} has been successfully registered with serial number ${serialNumber.split('').join(' ')}. ${newTasks.length} clinical tasks have been added to your list based on AI recommendations.`;
+    speechService.notifyChange('Patient Registration', speechMsg);
   };
 
   const loadPatient = (p: SavedPatient) => {
@@ -444,7 +488,8 @@ const App: React.FC = () => {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-lg font-black text-slate-900">{p.name}</h3>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{new Date(p.date).toLocaleDateString()}</p>
+                      <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">{p.serialNumber}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{new Date(p.date).toLocaleString()}</p>
                     </div>
                     <span className="px-2 py-1 bg-red-50 text-red-600 text-[9px] font-black rounded-lg uppercase border border-red-100">{p.ageGroup}</span>
                   </div>

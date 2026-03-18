@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
+import { Activity } from 'lucide-react';
 
 interface CardiacState {
   name: string;
@@ -131,9 +132,7 @@ const ECGAnimation: React.FC = () => {
     <div className="relative h-20 w-full bg-white/60 rounded border border-black/5 overflow-hidden flex items-center">
       <canvas ref={canvasRef} width={1000} height={200} className="flex-1 h-full ecg-glow" />
       <div ref={heartRef} className="heart-outer absolute right-3">
-        <span className="material-symbols-outlined heart-icon-google">
-          monitor_heart
-        </span>
+        <Activity className="text-red-500" size={24} />
       </div>
     </div>
   );

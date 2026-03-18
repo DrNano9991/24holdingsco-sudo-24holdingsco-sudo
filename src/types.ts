@@ -13,10 +13,12 @@ export enum Type {
 
 export interface SavedPatient {
   id: string;
+  serialNumber: string;
   name: string;
   date: string;
   ageGroup: AgeGroup;
   data: PatientData;
+  aiInsight?: any;
 }
 
 export interface PEWSState {
