@@ -7,6 +7,7 @@ import { Brain, Activity, Zap, AlertTriangle, Baby, Info, User, Scissors, Thermo
 
 import { ScoringEngine } from '../services/scoringEngine';
 import { speechService } from '../services/speechService';
+import { useTranslation } from '../contexts/TranslationContext';
 
 interface Props {
   ageGroup: AgeGroup;
@@ -27,6 +28,7 @@ interface Props {
 const CombinedCalculators: React.FC<Props> = ({ 
   ageGroup, gcs, setGcs, mews, setMews, sirs, setSirs, qsofa, setQsofa, pews, setPews, surgery, setSurgery 
 }) => {
+  const { t } = useTranslation();
   const gcsTotal = ScoringEngine.calculateGCS(gcs);
   const vitalsClass = ScoringEngine.classifyVitals(ageGroup, mews.hr, mews.rr, mews.sbp);
   const ariscatScore = ScoringEngine.calculateARISCAT(surgery);
@@ -42,9 +44,9 @@ const CombinedCalculators: React.FC<Props> = ({
   };
 
   const getAriscatRisk = (score: number) => {
-    if (score >= 45) return { label: 'High Risk', color: 'text-red-600' };
-    if (score >= 26) return { label: 'Intermediate Risk', color: 'text-orange-600' };
-    return { label: 'Low Risk', color: 'text-emerald-600' };
+    if (score >= 45) return { label: t('highRisk'), color: 'text-red-600' };
+    if (score >= 26) return { label: t('intermediateRisk'), color: 'text-orange-600' };
+    return { label: t('lowRisk'), color: 'text-emerald-600' };
   };
 
   const ariscatRisk = getAriscatRisk(ariscatScore);
@@ -62,7 +64,7 @@ const CombinedCalculators: React.FC<Props> = ({
 
   useEffect(() => {
     if (isAnyCritical && !prevCritical.current) {
-      speechService.notifyChange('CRITICAL ALERT', 'Immediate clinical intervention required. Vital signs have crossed critical thresholds.');
+      speechService.notifyChange(t('criticalAlert'), t('interventionRequired'));
       // Simple auditory beep using Web Audio API
       try {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -80,30 +82,48 @@ const CombinedCalculators: React.FC<Props> = ({
       }
     }
     prevCritical.current = isAnyCritical;
-  }, [isAnyCritical]);
+  }, [isAnyCritical, t]);
 
   useEffect(() => {
     if (gcsTotal !== prevGcs.current) {
-      speechService.notifyChange('Neurological Status', `G-C-S score updated to ${gcsTotal}.`);
+      speechService.notifyChange(t('neurologicalStatus'), `${t('gcsScoreUpdated')} ${gcsTotal}.`);
       prevGcs.current = gcsTotal;
     }
-  }, [gcsTotal]);
+  }, [gcsTotal, t]);
 
   useEffect(() => {
     const currentMews = ScoringEngine.calculateMEWS(mews);
     if (currentMews !== prevMews.current && ageGroup === 'Adult') {
-      speechService.notifyChange('Clinical Warning', `M-E-W-S score changed to ${currentMews}.`);
+      speechService.notifyChange(t('clinicalWarning'), `${t('mewsScoreChanged')} ${currentMews}.`);
       prevMews.current = currentMews;
     }
-  }, [mews, ageGroup]);
+  }, [mews, ageGroup, t]);
 
   useEffect(() => {
     const currentPews = ScoringEngine.calculatePEWS(pews);
     if (currentPews !== prevPews.current && ageGroup !== 'Adult') {
-      speechService.notifyChange('Pediatric Warning', `P-E-W-S score updated to ${currentPews}.`);
+      speechService.notifyChange(t('clinicalWarning'), `${t('pewsScoreChanged')} ${currentPews}.`);
       prevPews.current = currentPews;
     }
-  }, [pews, ageGroup]);
+  }, [pews, ageGroup, t]);
+
+  const translateStatus = (status: string) => {
+    const key = status.toLowerCase() as any;
+    try {
+      return t(key);
+    } catch {
+      return status;
+    }
+  };
+
+  const translateSeverity = (severity: string) => {
+    const key = severity.toLowerCase() as any;
+    try {
+      return t(key);
+    } catch {
+      return severity;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -114,8 +134,8 @@ const CombinedCalculators: React.FC<Props> = ({
               <AlertTriangle size={24} className="animate-bounce" />
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase tracking-tighter leading-none">Critical Alert</h3>
-              <p className="text-[10px] font-bold opacity-90 uppercase tracking-widest mt-1">Immediate Medical Review Required</p>
+              <h3 className="text-lg font-black uppercase tracking-tighter leading-none">{t('criticalAlert')}</h3>
+              <p className="text-[10px] font-bold opacity-90 uppercase tracking-widest mt-1">{t('interventionRequired')}</p>
             </div>
           </div>
           <div className="text-right">
@@ -133,10 +153,9 @@ const CombinedCalculators: React.FC<Props> = ({
           {(['eye', 'verbal', 'motor'] as const).map((type) => (
             <div key={type}>
               <div className="flex items-center gap-1 mb-2">
-                <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{type} Response</p>
-                <Tooltip text={`Assess the patient's ${type} response to stimuli.`}>
-                  <Info size={10} className="text-slate-600" />
-                </Tooltip>
+                <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">
+                  {type === 'eye' ? t('eyeOpening') : type === 'verbal' ? t('verbalResponse') : t('motorResponse')}
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {GCS_OPTIONS[type].map((opt) => (
@@ -149,8 +168,8 @@ const CombinedCalculators: React.FC<Props> = ({
                         : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600 hover:border-indigo-200'
                     }`}
                   >
-                    <div className="font-bold text-xs">{opt.label}</div>
-                    <div className="text-[10px] opacity-70 font-medium">{opt.sub}</div>
+                    <div className="font-bold text-xs">{t(opt.label.toLowerCase().replace(/\s+/g, '') as any)}</div>
+                    <div className="text-[10px] opacity-70 font-medium">{t(opt.sub.toLowerCase().replace(/\s+/g, '').replace(/[(),]/g, '') as any)}</div>
                   </button>
                 ))}
               </div>
@@ -171,14 +190,14 @@ const CombinedCalculators: React.FC<Props> = ({
           {(isMewsCritical || isVitalsCritical) && (
             <div className="bg-red-500/10 text-red-600 p-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-red-500/20">
               <AlertTriangle size={12} />
-              Critical Deviation Detected
+              {t('criticalAlert')}
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="flex items-center gap-1 mb-1">
-                <label className="text-[11px] font-black text-slate-600 uppercase block">SBP (mmHg)</label>
-                <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.sbp.severity)}`}>{vitalsClass.sbp.status}</span>
+                <label className="text-[11px] font-black text-slate-600 uppercase block">{t('systolicBPLabel')} (mmHg)</label>
+                <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.sbp.severity)}`}>{translateStatus(vitalsClass.sbp.status)}</span>
               </div>
               <input 
                 type="number" 
@@ -191,8 +210,8 @@ const CombinedCalculators: React.FC<Props> = ({
             </div>
             <div>
               <div className="flex items-center gap-1 mb-1">
-                <label className="text-[11px] font-black text-slate-600 uppercase block">HR (bpm)</label>
-                <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.hr.severity)}`}>{vitalsClass.hr.status}</span>
+                <label className="text-[11px] font-black text-slate-600 uppercase block">{t('heartRateLabel')} (bpm)</label>
+                <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.hr.severity)}`}>{translateStatus(vitalsClass.hr.status)}</span>
               </div>
               <input 
                 type="number" 
@@ -205,8 +224,8 @@ const CombinedCalculators: React.FC<Props> = ({
             </div>
             <div>
               <div className="flex items-center gap-1 mb-1">
-                <label className="text-[11px] font-black text-slate-600 uppercase block">RR (/min)</label>
-                <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.rr.severity)}`}>{vitalsClass.rr.status}</span>
+                <label className="text-[11px] font-black text-slate-600 uppercase block">{t('respiratoryRateLabel')} (/min)</label>
+                <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.rr.severity)}`}>{translateStatus(vitalsClass.rr.status)}</span>
               </div>
               <input 
                 type="number" 
@@ -218,7 +237,7 @@ const CombinedCalculators: React.FC<Props> = ({
               />
             </div>
             <div>
-              <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">Temp (°C)</label>
+              <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('temperatureLabel')} (°C)</label>
               <input 
                 type="number" 
                 value={mews.temp} 
@@ -230,7 +249,7 @@ const CombinedCalculators: React.FC<Props> = ({
             </div>
           </div>
           <div>
-            <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">AVPU Score</label>
+            <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('avpu')} Score</label>
             <div className="grid grid-cols-4 gap-2">
               {['Alert', 'Voice', 'Pain', 'Unresp'].map((label, i) => (
                 <button
@@ -251,11 +270,11 @@ const CombinedCalculators: React.FC<Props> = ({
       </ScoreCard>
 
       {/* SIRS Criteria */}
-      <ScoreCard title="SIRS" subtitle="Inflammatory Response" icon={<Activity size={20} />} color="red">
+      <ScoreCard title="SIRS" subtitle={t('inflammatoryResponse')} icon={<Activity size={20} />} color="red">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Temp (°C)</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">{t('temperatureLabel')} (°C)</label>
               <input 
                 type="number" 
                 value={sirs.temp} 
@@ -266,7 +285,7 @@ const CombinedCalculators: React.FC<Props> = ({
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">WBC (K/uL)</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">{t('wbcCountLabel')} (K/uL)</label>
               <input 
                 type="number" 
                 value={sirs.wbc} 
@@ -281,7 +300,7 @@ const CombinedCalculators: React.FC<Props> = ({
       </ScoreCard>
 
       {/* qSOFA Calculator */}
-      <ScoreCard title="qSOFA" subtitle="Quick Sepsis Organ Failure" icon={<Zap size={20}/>} score={ScoringEngine.calculateQSOFA(qsofa)} color="amber">
+      <ScoreCard title="qSOFA" subtitle={t('quickSepsisOrganFailure')} icon={<Zap size={20}/>} score={ScoringEngine.calculateQSOFA(qsofa)} color="amber">
         <div className="space-y-3">
           <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 cursor-pointer hover:bg-slate-100 transition-all border border-slate-200">
             <span className="font-bold text-slate-700 text-sm">SBP ≤ 100 mmHg</span>
@@ -292,7 +311,7 @@ const CombinedCalculators: React.FC<Props> = ({
             <input type="checkbox" checked={qsofa.highRR} onChange={e => setQsofa({...qsofa, highRR: e.target.checked})} className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 bg-white" />
           </label>
           <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 cursor-pointer hover:bg-slate-100 transition-all border border-slate-200">
-            <span className="font-bold text-slate-700 text-sm">Altered Mentation</span>
+            <span className="font-bold text-slate-700 text-sm">{t('alteredMentation')}</span>
             <input type="checkbox" checked={qsofa.alteredMentation} onChange={e => setQsofa({...qsofa, alteredMentation: e.target.checked})} className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 bg-white" />
           </label>
         </div>
@@ -301,7 +320,7 @@ const CombinedCalculators: React.FC<Props> = ({
       {/* PEWS Calculator */}
       <ScoreCard 
         title="PEWS" 
-        subtitle="Pediatric Early Warning" 
+        subtitle={t('pediatricEarlyWarning')} 
         icon={<Baby size={20} />} 
         score={ScoringEngine.calculatePEWS(pews)} 
         color={isPewsCritical ? "red" : "pink"}
@@ -310,13 +329,13 @@ const CombinedCalculators: React.FC<Props> = ({
           {isPewsCritical && (
             <div className="bg-red-500/10 text-red-600 p-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-red-500/20">
               <AlertTriangle size={12} />
-              Critical Pediatric Warning
+              {t('criticalAlert')}
             </div>
           )}
           <div className="grid grid-cols-1 gap-2">
             {(['behavior', 'cardiovascular', 'respiratory'] as const).map((type) => (
               <div key={type}>
-                <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{type} (0-3)</label>
+                <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t(type as any)} (0-3)</label>
                 <div className="flex gap-1">
                   {[0, 1, 2, 3].map((val) => (
                     <button
@@ -337,11 +356,11 @@ const CombinedCalculators: React.FC<Props> = ({
           </div>
           <div className="flex gap-2">
             <label className="flex-1 flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all">
-              <span className="text-[11px] font-bold text-slate-600">Nebulizer</span>
+              <span className="text-[11px] font-bold text-slate-600">{t('nebulizer')}</span>
               <input type="checkbox" checked={pews.nebulizer} onChange={e => setPews({...pews, nebulizer: e.target.checked})} className="h-4 w-4 text-pink-600 bg-white border-slate-300" />
             </label>
             <label className="flex-1 flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all">
-              <span className="text-[11px] font-bold text-slate-600">Vomiting</span>
+              <span className="text-[11px] font-bold text-slate-600">{t('vomiting')}</span>
               <input type="checkbox" checked={pews.persistentVomiting} onChange={e => setPews({...pews, persistentVomiting: e.target.checked})} className="h-4 w-4 text-pink-600 bg-white border-slate-300" />
             </label>
           </div>
@@ -349,10 +368,10 @@ const CombinedCalculators: React.FC<Props> = ({
       </ScoreCard>
 
       {/* Surgical Risk Calculator */}
-      <ScoreCard title="Surgical Risk" subtitle="ARISCAT Score" icon={<Scissors size={20} />} score={ariscatScore} color="emerald">
+      <ScoreCard title={t('surgicalRisk')} subtitle="ARISCAT Score" icon={<Scissors size={20} />} score={ariscatScore} color="emerald">
         <div className="space-y-4">
           <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
-            <span className="text-[11px] font-black text-slate-600 uppercase">Risk Level</span>
+            <span className="text-[11px] font-black text-slate-600 uppercase">{t('riskLevel')}</span>
             <span className={`text-xs font-black uppercase ${ariscatRisk.color}`}>{ariscatRisk.label}</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -377,29 +396,29 @@ const CombinedCalculators: React.FC<Props> = ({
             </div>
           </div>
           <div>
-            <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">Surgical Incision Type</label>
+            <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('surgicalSite')}</label>
             <select 
               value={surgery.surgeryType} 
               onChange={e => setSurgery({...surgery, surgeryType: e.target.value})}
               className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
             >
-              <option value="Peripheral">Peripheral</option>
-              <option value="Upper Abdominal">Upper Abdominal</option>
-              <option value="Intrathoracic">Intrathoracic</option>
+              <option value="Peripheral">{t('peripheral')}</option>
+              <option value="Upper Abdominal">{t('upperAbdominal')}</option>
+              <option value="Intrathoracic">{t('intrathoracic')}</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all">
-              <span className="text-[11px] font-bold text-slate-600">Resp Infection (1mo)</span>
+              <span className="text-[11px] font-bold text-slate-600">{t('respiratoryInfection')}</span>
               <input type="checkbox" checked={surgery.respInfection} onChange={e => setSurgery({...surgery, respInfection: e.target.checked})} className="h-4 w-4 text-emerald-600 bg-white border-slate-300 rounded" />
             </label>
             <label className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all">
-              <span className="text-[11px] font-bold text-slate-600">Pre-op Anemia</span>
+              <span className="text-[11px] font-bold text-slate-600">{t('anemia')}</span>
               <input type="checkbox" checked={surgery.preOpAnemia} onChange={e => setSurgery({...surgery, preOpAnemia: e.target.checked})} className="h-4 w-4 text-emerald-600 bg-white border-slate-300 rounded" />
             </label>
           </div>
           <div>
-            <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">Surgery Duration</label>
+            <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('duration')}</label>
             <div className="grid grid-cols-3 gap-2">
               {['<2h', '2-3h', '>3h'].map(d => (
                 <button 

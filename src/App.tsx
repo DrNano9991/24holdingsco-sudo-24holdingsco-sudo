@@ -1,25 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { 
   Activity, Brain, Wind, Stethoscope, ShieldCheck, Moon, Sun, Calculator, AlertCircle, Eye, Zap,
-  Volume2, VolumeX, Info, X
+  Volume2, VolumeX, Info, X, Languages
 } from 'lucide-react';
 import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, SurgicalState, PatientData, SavedPatient, Task } from './types';
 import { BOTTOM_NAV_SECTIONS } from './constants';
 import ScoreCard from './components/ScoreCard';
-import CombinedCalculators from './components/CombinedCalculators';
-import PhysicalExam from './components/PhysicalExam';
 import MedicalBackground from './components/MedicalBackground';
 import { clinicalAI, SynthesisResult, SynthesisOptions } from './services/clinicalAI';
 import { ScoringEngine } from './services/scoringEngine';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import TaskList from './components/TaskList';
 import ScoreSummaryPanel from './components/ScoreSummaryPanel';
 import { AgeGroup, PEWSState } from './types';
 import { Save, FolderOpen, Trash2, UserPlus, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useTranslation } from './contexts/TranslationContext';
+import { logger } from './services/logger';
 
 import ReactMarkdown from 'react-markdown';
 import Screensaver from './components/Screensaver';
 import { speechService } from './services/speechService';
+
+// Lazy loaded components
+const CombinedCalculators = lazy(() => import('./components/CombinedCalculators'));
+const PhysicalExam = lazy(() => import('./components/PhysicalExam'));
+const TaskList = lazy(() => import('./components/TaskList'));
+
+const LoadingFallback = () => (
+  <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+    <div className="w-12 h-12 border-4 border-slate-200 border-t-red-600 rounded-full animate-spin mb-4"></div>
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Clinical Module...</p>
+  </div>
+);
 
 const getPlatform = (): 'ios' | 'android' => {
   const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
@@ -29,6 +40,7 @@ const getPlatform = (): 'ios' | 'android' => {
 };
 
 const App: React.FC = () => {
+  const { t, language, setLanguage } = useTranslation();
   const [platform, setPlatform] = useState<'ios' | 'android'>('android');
   const [isSplashing, setIsSplashing] = useState(true);
   const [activeTab, setActiveTab] = useState('calculators');
@@ -204,8 +216,9 @@ const App: React.FC = () => {
       if (isSpeechEnabled && result.summary) {
         speechService.speak(result.summary);
       }
+      logger.info('Clinical synthesis completed', { primaryType, primaryValue });
     } catch (e) {
-      console.error(e);
+      logger.error('Clinical synthesis failed', e);
     } finally {
       setIsGenerating(false);
     }
@@ -373,8 +386,8 @@ const App: React.FC = () => {
                   <Activity className="text-white" size={20} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Patient Classification</p>
-                  <p className="text-lg font-black text-slate-900">{ageGroup}</p>
+                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{t('patientClassification')}</p>
+                  <p className="text-lg font-black text-slate-900">{t(ageGroup.toLowerCase() as any)}</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -388,7 +401,7 @@ const App: React.FC = () => {
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {group}
+                    {t(group.toLowerCase() as any)}
                   </button>
                 ))}
               </div>
@@ -476,7 +489,7 @@ const App: React.FC = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                <FolderOpen className="text-red-600" /> Saved Patients
+                <FolderOpen className="text-red-600" /> {t('savedPatients')}
               </h2>
               <button onClick={() => setActiveTab('calculators')} className="p-3 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 transition-all">
                 <UserPlus size={20} />
@@ -491,14 +504,14 @@ const App: React.FC = () => {
                       <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">{p.serialNumber}</p>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{new Date(p.date).toLocaleString()}</p>
                     </div>
-                    <span className="px-2 py-1 bg-red-50 text-red-600 text-[9px] font-black rounded-lg uppercase border border-red-100">{p.ageGroup}</span>
+                    <span className="px-2 py-1 bg-red-50 text-red-600 text-[9px] font-black rounded-lg uppercase border border-red-100">{t(p.ageGroup.toLowerCase() as any)}</span>
                   </div>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => loadPatient(p)}
                       className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-black rounded-xl transition-all"
                     >
-                      Load Data
+                      {t('loadData')}
                     </button>
                     <button 
                       onClick={() => deletePatient(p.id)}
@@ -512,7 +525,7 @@ const App: React.FC = () => {
               {savedPatients.length === 0 && (
                 <div className="col-span-full py-20 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                   <FolderOpen size={48} className="mx-auto text-slate-300 mb-4" />
-                  <p className="text-slate-500 font-bold">No saved patient records found.</p>
+                  <p className="text-slate-500 font-bold">{t('noSavedPatients')}</p>
                 </div>
               )}
             </div>
@@ -530,15 +543,15 @@ const App: React.FC = () => {
                          <Activity className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-900" size={28} />
                       </div>
                       <div className="text-center">
-                         <p className="text-xl font-black text-slate-900 tracking-tight">Synthesizing Evidence</p>
-                         <p className="text-slate-500 animate-pulse mt-1 font-bold uppercase text-[9px] tracking-[0.2em]">Ai Medica Engine Active</p>
+                         <p className="text-xl font-black text-slate-900 tracking-tight">{t('synthesizing')}</p>
+                         <p className="text-slate-500 animate-pulse mt-1 font-bold uppercase text-[9px] tracking-[0.2em]">{t('engineActive')}</p>
                       </div>
                    </div>
                  ) : aiInsight ? (
                    <div className="flex flex-col h-full">
                       <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
                          <h2 className="text-xl font-black text-slate-900 flex items-center gap-2.5 m-0">
-                            <Stethoscope className="text-red-600" size={24} /> Clinical Synthesis
+                            <Stethoscope className="text-red-600" size={24} /> {t('clinicalSynthesis')}
                             {aiInsight.riskLevel && (
                               <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
                                 aiInsight.riskLevel === 'Critical' ? 'bg-red-600 text-white animate-pulse' :
@@ -546,7 +559,7 @@ const App: React.FC = () => {
                                 aiInsight.riskLevel === 'Moderate' ? 'bg-orange-100 text-orange-600' :
                                 'bg-emerald-100 text-emerald-600'
                               }`}>
-                                {aiInsight.riskLevel} Risk
+                                {aiInsight.riskLevel} {t('riskLevel')}
                               </span>
                             )}
                          </h2>
@@ -560,7 +573,7 @@ const App: React.FC = () => {
                                  >
                                    {f}
                                  </button>
-                               ))}
+                                ))}
                             </div>
                             <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
                                {(['concise', 'standard', 'detailed'] as const).map(d => (
@@ -571,19 +584,19 @@ const App: React.FC = () => {
                                  >
                                    {d}
                                  </button>
-                               ))}
+                                ))}
                             </div>
-                            <button onClick={handleConsult} className="text-xs font-bold text-slate-500 hover:text-red-600 transition-all">Regenerate</button>
+                            <button onClick={handleConsult} className="text-xs font-bold text-slate-500 hover:text-red-600 transition-all">{t('regenerate')}</button>
                          </div>
                       </div>
                       
                       <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
                         {[
-                          { id: 'summary', label: 'Summary' },
-                          { id: 'actions', label: 'Actions' },
-                          { id: 'diagnostics', label: 'Workup' },
-                          { id: 'education', label: 'Education' },
-                          { id: 'documentation', label: 'Notes' }
+                          { id: 'summary', label: t('summary') },
+                          { id: 'actions', label: t('actions') },
+                          { id: 'diagnostics', label: t('workup') },
+                          { id: 'education', label: t('education') },
+                          { id: 'documentation', label: t('documentation') }
                         ].map(tab => (
                           <button
                             key={tab.id}
@@ -613,7 +626,7 @@ const App: React.FC = () => {
                                  <span className="font-bold tracking-tight">{action}</span>
                                </li>
                              ))}
-                             {aiInsight.actions.length === 0 && <p className="text-slate-500 italic p-6 text-center uppercase tracking-widest text-[10px]">No immediate actions required</p>}
+                             {aiInsight.actions.length === 0 && <p className="text-slate-500 italic p-6 text-center uppercase tracking-widest text-[10px]">{t('noActions')}</p>}
                            </ul>
                          )}
                          {consultTab === 'diagnostics' && (
@@ -624,7 +637,7 @@ const App: React.FC = () => {
                                  <span className="font-bold tracking-tight">{diag}</span>
                                </li>
                              ))}
-                             {aiInsight.diagnostics.length === 0 && <p className="text-slate-500 italic p-6 text-center uppercase tracking-widest text-[10px]">No specific diagnostics recommended</p>}
+                             {aiInsight.diagnostics.length === 0 && <p className="text-slate-500 italic p-6 text-center uppercase tracking-widest text-[10px]">{t('noDiagnostics')}</p>}
                            </ul>
                          )}
                          {consultTab === 'education' && (
@@ -635,7 +648,7 @@ const App: React.FC = () => {
                                  <span className="font-bold tracking-tight">{edu}</span>
                                </li>
                              ))}
-                             {aiInsight.education.length === 0 && <p className="text-slate-500 italic p-6 text-center uppercase tracking-widest text-[10px]">No specific education points</p>}
+                             {aiInsight.education.length === 0 && <p className="text-slate-500 italic p-6 text-center uppercase tracking-widest text-[10px]">{t('noEducation')}</p>}
                            </ul>
                          )}
                          {consultTab === 'documentation' && (
@@ -647,8 +660,8 @@ const App: React.FC = () => {
                    </div>
                  ) : (
                    <div className="flex flex-col items-center justify-center h-full text-center">
-                      <h3 className="text-xl font-black text-slate-900 tracking-tight">No Data for Analysis</h3>
-                      <p className="text-slate-500 max-w-xs mt-2 text-sm">Please fill out scoring tools to generate a clinical summary.</p>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">{t('noDataForAnalysis')}</h3>
+                      <p className="text-slate-500 max-w-xs mt-2 text-sm">{t('fillScoringTools')}</p>
                    </div>
                  )}
               </div>
@@ -656,7 +669,7 @@ const App: React.FC = () => {
                 <textarea 
                   value={notes} 
                   onChange={e => setNotes(e.target.value)} 
-                  placeholder="Add case notes here..." 
+                  placeholder={t('addCaseNotes')} 
                   className="w-full h-24 bg-slate-100/60 border-2 border-slate-200 rounded-xl p-3 text-slate-900 outline-none focus:ring-2 ring-red-400 transition-all font-semibold text-sm"
                 />
               </div>
@@ -675,17 +688,17 @@ const App: React.FC = () => {
       {showSaveModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-300">
-            <h3 className="text-xl font-black text-slate-900 mb-4">Save Patient Record</h3>
+            <h3 className="text-xl font-black text-slate-900 mb-4">{t('savePatientRecord')}</h3>
             <input 
               type="text" 
-              placeholder="Enter Patient Name/ID" 
+              placeholder={t('enterPatientName')} 
               value={patientName}
               onChange={e => setPatientName(e.target.value)}
               className="w-full p-4 bg-slate-100 border-2 border-slate-200 rounded-2xl font-bold text-slate-900 outline-none focus:border-red-500 transition-all mb-4"
             />
             <div className="flex gap-3">
-              <button onClick={() => setShowSaveModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-black rounded-2xl">Cancel</button>
-              <button onClick={savePatient} className="flex-1 py-3 bg-red-600 text-white font-black rounded-2xl shadow-lg shadow-red-600/20">Save</button>
+              <button onClick={() => setShowSaveModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-black rounded-2xl">{t('cancel')}</button>
+              <button onClick={savePatient} className="flex-1 py-3 bg-red-600 text-white font-black rounded-2xl shadow-lg shadow-red-600/20">{t('save')}</button>
             </div>
           </div>
         </div>
@@ -708,8 +721,8 @@ const App: React.FC = () => {
                 <Activity className="text-white" size={24} />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-slate-900 leading-none">Ai Medica UG</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Clinical Decision Support</p>
+                <h3 className="text-2xl font-black text-slate-900 leading-none">{t('appName')}</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">{t('tagline')}</p>
               </div>
             </div>
 
@@ -739,13 +752,13 @@ const App: React.FC = () => {
                   onClick={() => speechService.stop()}
                   className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl hover:bg-slate-200 transition-all"
                 >
-                  Stop Reading
+                  {t('stopReading')}
                 </button>
                 <button 
                   onClick={closeAboutModal}
                   className="flex-1 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:scale-[1.02] transition-all"
                 >
-                  Close
+                  {t('close')}
                 </button>
               </div>
             </div>
@@ -763,13 +776,13 @@ const App: React.FC = () => {
                 </div>
               }
               <h1 className="header-title text-slate-900 whitespace-nowrap">
-                {platform === 'ios' ? 'AI Medica' : <>Ai Medica <span className="text-red-600">UG</span></>}
+                {platform === 'ios' ? 'AI Medica' : <>{t('appName')} <span className="text-red-600">UG</span></>}
               </h1>
             </div>
 
             {/* Compact Header Navigation */}
             <div className="hidden lg:flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200/50 mx-4 overflow-hidden">
-              {[...BOTTOM_NAV_SECTIONS, { id: 'patients', name: 'Records', icon: <FolderOpen size={14} /> }].map((s) => (
+              {[...BOTTOM_NAV_SECTIONS, { id: 'patients', name: t('records'), icon: <FolderOpen size={14} /> }].map((s) => (
                 <button 
                   key={s.id} 
                   onClick={() => setActiveTab(s.id)} 
@@ -782,27 +795,35 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 header-actions">
+              <button 
+                onClick={() => setLanguage(language === 'en' ? 'sw' : 'en')}
+                className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600 flex items-center gap-1"
+                title={t('switchLanguage')}
+              >
+                <Languages size={20} />
+                <span className="text-[10px] font-black uppercase">{language}</span>
+              </button>
               <div className={`hidden sm:flex items-center gap-2 px-3 py-1 ${isOnline ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-orange-500/10 border-orange-500/20'} border rounded-full`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-orange-500'} animate-pulse`} />
                 <span className={`text-[9px] font-black ${isOnline ? 'text-emerald-600' : 'text-orange-600'} uppercase tracking-widest`}>
-                  {isOnline ? 'Cloud AI Active' : 'Local AI Active'}
+                  {isOnline ? t('cloudAiActive') : t('localAiActive')}
                 </span>
               </div>
               <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Auto-Save Active</span>
+                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">{t('autoSaveActive')}</span>
               </div>
               <button 
                 onClick={() => setShowSaveModal(true)} 
                 className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600" 
-                title="Save Patient Data"
+                title={t('savePatient')}
               >
                 <Save size={20} />
               </button>
-              <button onClick={handleAboutPress} className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600" title="About">
+              <button onClick={handleAboutPress} className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600" title={t('about')}>
                 <Info size={20} />
               </button>
-              <button onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} className={`p-2 rounded-full transition-all ${isSpeechEnabled ? 'text-red-600 bg-red-50' : 'text-slate-600 hover:bg-slate-200/80'}`} title={isSpeechEnabled ? "Disable Speech" : "Enable Speech"}>
+              <button onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} className={`p-2 rounded-full transition-all ${isSpeechEnabled ? 'text-red-600 bg-red-50' : 'text-slate-600 hover:bg-slate-200/80'}`} title={isSpeechEnabled ? t('disableSpeech') : t('enableSpeech')}>
                 {isSpeechEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
               </button>
               <button onClick={toggleNightMode} className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600">
@@ -823,7 +844,7 @@ const App: React.FC = () => {
       {/* Mobile Bottom Nav - Only visible on small screens */}
       <nav className="bottom-nav lg:hidden">
         <div className="flex justify-around items-center h-16 max-w-7xl mx-auto">
-          {[...BOTTOM_NAV_SECTIONS, { id: 'patients', name: 'Records', icon: <FolderOpen size={20} /> }].map((s) => (
+          {[...BOTTOM_NAV_SECTIONS, { id: 'patients', name: t('records'), icon: <FolderOpen size={20} /> }].map((s) => (
             <button key={s.id} onClick={() => setActiveTab(s.id)} className={`bottom-nav-button flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === s.id ? 'active text-red-600' : 'text-slate-500 hover:bg-slate-100/50'}`}>
               {s.icon}
               <span className="font-bold text-[10px]">{s.name}</span>

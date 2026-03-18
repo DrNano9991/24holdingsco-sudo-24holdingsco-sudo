@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import MedicalBackground from './MedicalBackground';
 import ECGAnimation from './ECGAnimation';
 import { Activity, ShieldAlert } from 'lucide-react';
+import { useTranslation } from '../contexts/TranslationContext';
 
 const Screensaver: React.FC = () => {
+  const { t } = useTranslation();
   const [theme, setTheme] = useState<'default' | 'emerald' | 'rose' | 'amber'>('default');
   const themes: ('default' | 'emerald' | 'rose' | 'amber')[] = ['default', 'emerald', 'rose', 'amber'];
 
@@ -29,31 +31,31 @@ const Screensaver: React.FC = () => {
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-red-600/5 border border-red-500/10 text-red-600 animate-pulse">
             <ShieldAlert size={16} />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em]">System Standby • Clinical Monitoring Active</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">{t('systemStandby')}</span>
           </div>
           <h1 className="text-6xl font-black text-slate-800 tracking-tighter">
             AI <span className="text-red-600">MEDICA</span>
           </h1>
-          <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-xs">Biometric Data Stream</p>
+          <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-xs">{t('biometricStream')}</p>
         </div>
 
         {/* ECG Display */}
         <div className="w-full glass-panel p-8 shadow-2xl relative group overflow-hidden">
           <div className="absolute top-4 left-6 flex items-center gap-2">
             <Activity className="text-red-500 animate-pulse" size={16} />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live ECG Feed</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('liveECG')}</span>
           </div>
-          <div className="absolute top-4 right-6 text-[10px] font-mono text-emerald-600">
-            HR: 72 BPM • SINUS RHYTHM
+          <div className="absolute top-4 right-6 text-[10px] font-mono text-emerald-600 uppercase">
+            {t('heartRate')}: 72 BPM • {t('sinusRhythm')}
           </div>
           <ECGAnimation />
         </div>
 
         <div className="grid grid-cols-3 gap-8 w-full">
           {[
-            { label: 'Neural Link', value: 'Active', color: 'text-blue-600' },
-            { label: 'Bio-Sync', value: '98.4%', color: 'text-emerald-600' },
-            { label: 'Uptime', value: '24:00:00', color: 'text-slate-500' }
+            { label: t('neuralLink'), value: 'Active', color: 'text-blue-600' },
+            { label: t('bioSync'), value: '98.4%', color: 'text-emerald-600' },
+            { label: t('uptime'), value: '24:00:00', color: 'text-slate-500' }
           ].map((stat, i) => (
             <div key={i} className="text-center space-y-1">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
@@ -64,7 +66,7 @@ const Screensaver: React.FC = () => {
 
         <div className="pt-12">
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] animate-bounce">
-            Move mouse or touch to resume
+            {t('resume')}
           </p>
         </div>
       </div>
