@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { GCSState, MEWSState, SIRSState, QSOFAState, PEWSState, AgeGroup, ExamState, SurgicalState } from '../types';
 import { GCS_OPTIONS } from '../constants';
 import ScoreCard from './ScoreCard';
@@ -6,6 +6,7 @@ import Tooltip from './Tooltip';
 import { Brain, Activity, Zap, AlertTriangle, Baby, Info, User, Scissors, Thermometer, Droplets } from 'lucide-react';
 
 import { ScoringEngine } from '../services/scoringEngine';
+import { speechService } from '../services/speechService';
 
 interface Props {
   ageGroup: AgeGroup;
@@ -47,6 +48,34 @@ const CombinedCalculators: React.FC<Props> = ({
   };
 
   const ariscatRisk = getAriscatRisk(ariscatScore);
+
+  // --- CHANGE DETECTION NOTIFICATIONS ---
+  const prevGcs = useRef(gcsTotal);
+  const prevMews = useRef(ScoringEngine.calculateMEWS(mews));
+  const prevPews = useRef(ScoringEngine.calculatePEWS(pews));
+
+  useEffect(() => {
+    if (gcsTotal !== prevGcs.current) {
+      speechService.notifyChange('Neurological Status', `G-C-S score updated to ${gcsTotal}.`);
+      prevGcs.current = gcsTotal;
+    }
+  }, [gcsTotal]);
+
+  useEffect(() => {
+    const currentMews = ScoringEngine.calculateMEWS(mews);
+    if (currentMews !== prevMews.current && ageGroup === 'Adult') {
+      speechService.notifyChange('Clinical Warning', `M-E-W-S score changed to ${currentMews}.`);
+      prevMews.current = currentMews;
+    }
+  }, [mews, ageGroup]);
+
+  useEffect(() => {
+    const currentPews = ScoringEngine.calculatePEWS(pews);
+    if (currentPews !== prevPews.current && ageGroup !== 'Adult') {
+      speechService.notifyChange('Pediatric Warning', `P-E-W-S score updated to ${currentPews}.`);
+      prevPews.current = currentPews;
+    }
+  }, [pews, ageGroup]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

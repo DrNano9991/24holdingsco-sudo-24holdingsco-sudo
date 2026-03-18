@@ -114,7 +114,27 @@ const App: React.FC = () => {
     document.body.classList.toggle('eye-comfort', isEyeComfort);
     document.body.classList.toggle('night-mode', isNightMode);
     document.documentElement.classList.toggle('dark', isNightMode);
+    
+    // Notify on mode change if it was a user action (not initial load)
+    // We can use a ref to skip initial load if needed, but simple is fine for now
   }, [isEyeComfort, isNightMode]);
+
+  const toggleNightMode = () => {
+    const next = !isNightMode;
+    setIsNightMode(next);
+    speechService.notifyChange('Display Mode', `Night mode ${next ? 'enabled' : 'disabled'}.`);
+  };
+
+  const toggleEyeComfort = () => {
+    const next = !isEyeComfort;
+    setIsEyeComfort(next);
+    speechService.notifyChange('Display Mode', `Eye comfort filter ${next ? 'activated' : 'deactivated'}.`);
+  };
+
+  const handleAgeGroupChange = (group: AgeGroup) => {
+    setAgeGroup(group);
+    speechService.notifyChange('Patient Classification', `Patient type changed to ${group}.`);
+  };
 
   useEffect(() => {
     speechService.setEnabled(isSpeechEnabled);
@@ -205,6 +225,7 @@ const App: React.FC = () => {
     setSavedPatients([newPatient, ...savedPatients]);
     setPatientName('');
     setShowSaveModal(false);
+    speechService.notifyChange('Patient Registration', `Patient ${newPatient.name} has been successfully registered and saved to the database.`);
   };
 
   const loadPatient = (p: SavedPatient) => {
@@ -217,9 +238,14 @@ const App: React.FC = () => {
     setNotes(p.data.notes);
     // Load others if needed
     setActiveTab('calculators');
+    speechService.notifyChange('Database Access', `Loading clinical data for patient ${p.name}.`);
   };
 
   const deletePatient = (id: string) => {
+    const patient = savedPatients.find(p => p.id === id);
+    if (patient) {
+      speechService.notifyChange('Database Update', `Patient record for ${patient.name} has been removed.`);
+    }
     setSavedPatients(savedPatients.filter(p => p.id !== id));
   };
 
@@ -311,7 +337,7 @@ const App: React.FC = () => {
                 {(['Adult', 'Pediatric', 'Neonate'] as const).map((group) => (
                   <button
                     key={group}
-                    onClick={() => setAgeGroup(group)}
+                    onClick={() => handleAgeGroupChange(group)}
                     className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
                       ageGroup === group 
                         ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' 
@@ -734,10 +760,10 @@ const App: React.FC = () => {
               <button onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} className={`p-2 rounded-full transition-all ${isSpeechEnabled ? 'text-red-600 bg-red-50' : 'text-slate-600 hover:bg-slate-200/80'}`} title={isSpeechEnabled ? "Disable Speech" : "Enable Speech"}>
                 {isSpeechEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
               </button>
-              <button onClick={() => setIsNightMode(!isNightMode)} className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600">
+              <button onClick={toggleNightMode} className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600">
                 {isNightMode ? <Sun size={20} /> : <Moon size={20} />}
               </button>
-              <button onClick={() => setIsEyeComfort(!isEyeComfort)} className={`p-2 rounded-full transition-all ${isEyeComfort ? 'bg-orange-100 text-orange-600' : 'text-slate-600 hover:bg-slate-200/80'}`}>
+              <button onClick={toggleEyeComfort} className={`p-2 rounded-full transition-all ${isEyeComfort ? 'bg-orange-100 text-orange-600' : 'text-slate-600 hover:bg-slate-200/80'}`}>
                 <Eye size={20} />
               </button>
             </div>

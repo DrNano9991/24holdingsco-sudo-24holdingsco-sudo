@@ -119,3 +119,14 @@ export interface PatientData {
   notes: string;
   anthro?: { waist: number | ''; height: number | ''; };
 }
+
+export interface Task {
+  id: string;
+  text: string;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  patientId?: string;
+  patientName?: string;
+  createdAt: string;
+  completedAt?: string;
+}

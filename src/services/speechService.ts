@@ -16,7 +16,11 @@ export class SpeechService {
   private initVoice() {
     const voices = this.synth.getVoices();
     // Prefer "Google US English" or "Microsoft Zira" or any "natural" sounding voice
-    this.voice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Natural')) || 
+    // We want a stable, lower-pitched voice if possible
+    this.voice = voices.find(v => v.name.includes('Google US English') && v.name.includes('Natural')) || 
+                 voices.find(v => v.name.includes('Google US English')) ||
+                 voices.find(v => v.name.includes('Microsoft Zira')) ||
+                 voices.find(v => v.lang.startsWith('en-US')) || 
                  voices.find(v => v.lang.startsWith('en')) || 
                  voices[0];
   }
@@ -37,6 +41,14 @@ export class SpeechService {
 
   public getIsEnabled(): boolean {
     return this.isEnabled;
+  }
+
+  /**
+   * Notifies the user of a change in the application state
+   */
+  public notifyChange(category: string, detail: string) {
+    const message = `System Update: ${category}. ${detail}`;
+    this.speak(message, 'normal');
   }
 
   /**
@@ -84,6 +96,7 @@ export class SpeechService {
       '<': ' less than ',
       '>=': ' greater than or equal to ',
       '<=': ' less than or equal to ',
+      'mmHg': ' millimeters of mercury ',
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -92,10 +105,10 @@ export class SpeechService {
     }
 
     // Breath and Rhythm: Insert subtle pauses at commas and logical breaks
-    // We can simulate pauses by adding extra commas or using specific punctuation
-    processed = processed.replace(/,/g, ', ... ');
-    processed = processed.replace(/\. /g, '. ... ... ');
-    processed = processed.replace(/: /g, ': ... ');
+    // Using periods for longer pauses and commas for shorter ones
+    processed = processed.replace(/,/g, ', ');
+    processed = processed.replace(/\. /g, '. ... ');
+    processed = processed.replace(/: /g, ': ');
 
     return processed;
   }
@@ -113,19 +126,20 @@ export class SpeechService {
       utterance.voice = this.voice;
     }
 
-    // Tone: Warm, conversational, and human-like
-    // Vary pitch and speed to avoid robotic cadence
-    utterance.pitch = 1.05; // Slightly warmer
+    // Tone: Stable, professional, and human-like
+    // Lower pitch for more stability and less "robotic" feel
+    utterance.pitch = 0.95; // Slightly lower for stability
     utterance.volume = 1.0;
 
     // Adjust rate based on priority, but keep it natural
     if (priority === 'high') {
-      utterance.rate = 0.95;
-    } else if (priority === 'critical') {
-      utterance.rate = 0.9;
-      utterance.pitch = 1.15;
-    } else {
       utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+    } else if (priority === 'critical') {
+      utterance.rate = 1.1;
+      utterance.pitch = 1.05;
+    } else {
+      utterance.rate = 0.95; // Slightly slower for more "human" feel
     }
 
     this.synth.speak(utterance);
