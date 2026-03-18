@@ -98,6 +98,18 @@ export class ScoringEngine {
     return score;
   }
 
+  static calculateBMI(weight: number | '', height: number | ''): number | null {
+    if (weight === '' || height === '' || height === 0) return null;
+    // weight in kg, height in cm
+    const heightInMeters = Number(height) / 100;
+    return Number((Number(weight) / (heightInMeters * heightInMeters)).toFixed(1));
+  }
+
+  static calculateWHR(waist: number | '', hip: number | ''): number | null {
+    if (waist === '' || hip === '' || hip === 0) return null;
+    return Number((Number(waist) / Number(hip)).toFixed(2));
+  }
+
   static classifyVitals(ageGroup: AgeGroup, hr: number, rr: number, sbp: number) {
     const ranges = {
       Neonate: { 

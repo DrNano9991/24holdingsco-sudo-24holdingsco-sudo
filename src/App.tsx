@@ -95,7 +95,7 @@ const App: React.FC = () => {
   const [chads, setChads] = useLocalStorage('ai-medica-chads', { chf: false, htn: false, age75: false, dm: false, stroke: false, vascular: false, age65: false, female: false });
   const [pews, setPews] = useLocalStorage<PEWSState>('ai-medica-pews', { behavior: 0, cardiovascular: 0, respiratory: 0, nebulizer: false, persistentVomiting: false });
   const [ageGroup, setAgeGroup] = useLocalStorage<AgeGroup>('ai-medica-age-group', 'Adult');
-  const [anthro, setAnthro] = useLocalStorage<{ waist: number | ''; height: number | ''; }>('ai-medica-anthro', { waist: '', height: '' });
+  const [anthro, setAnthro] = useLocalStorage<{ waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; }>('ai-medica-anthro', { waist: '', height: '', hip: '', weight: '' });
   const [notes, setNotes] = useLocalStorage('ai-medica-notes', '');
 
   // --- SAVED PATIENTS ---
@@ -350,7 +350,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <ScoreSummaryPanel gcs={gcs} mews={mews} sirs={sirs} qsofa={qsofa} curb65={curb65} pews={pews} surgery={surgery} />
+            <ScoreSummaryPanel gcs={gcs} mews={mews} sirs={sirs} qsofa={qsofa} curb65={curb65} pews={pews} surgery={surgery} anthro={anthro} />
             
             <CombinedCalculators 
               ageGroup={ageGroup}

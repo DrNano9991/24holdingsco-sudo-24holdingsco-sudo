@@ -8,8 +8,8 @@ interface PhysicalExamProps {
   setExam: (exam: ExamState) => void;
   liver: LiverState;
   setLiver: (liver: LiverState) => void;
-  anthro: { waist: number | ''; height: number | ''; };
-  setAnthro: (anthro: { waist: number | ''; height: number | ''; }) => void;
+  anthro: { waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; };
+  setAnthro: (anthro: { waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; }) => void;
 }
 
 const PhysicalExam: React.FC<PhysicalExamProps> = ({ 
@@ -17,6 +17,9 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
   liver, setLiver,
   anthro, setAnthro 
 }) => {
+  const bmi = (anthro.weight && anthro.height) ? (Number(anthro.weight) / Math.pow(Number(anthro.height) / 100, 2)).toFixed(1) : null;
+  const whr = (anthro.waist && anthro.hip) ? (Number(anthro.waist) / Number(anthro.hip)).toFixed(2) : null;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between mb-2">
@@ -175,13 +178,13 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Waist (cm)</label>
+                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Weight (kg)</label>
                 <input 
                   type="number" 
-                  value={anthro.waist} 
-                  onChange={e => setAnthro({...anthro, waist: e.target.value === '' ? '' : Number(e.target.value)})}
+                  value={anthro.weight} 
+                  onChange={e => setAnthro({...anthro, weight: e.target.value === '' ? '' : Number(e.target.value)})}
                   className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
-                  placeholder="e.g. 90"
+                  placeholder="e.g. 70"
                 />
               </div>
               <div>
@@ -195,6 +198,50 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Waist (cm)</label>
+                <input 
+                  type="number" 
+                  value={anthro.waist} 
+                  onChange={e => setAnthro({...anthro, waist: e.target.value === '' ? '' : Number(e.target.value)})}
+                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
+                  placeholder="e.g. 90"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Hip (cm)</label>
+                <input 
+                  type="number" 
+                  value={anthro.hip} 
+                  onChange={e => setAnthro({...anthro, hip: e.target.value === '' ? '' : Number(e.target.value)})}
+                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
+                  placeholder="e.g. 100"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {bmi && (
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">BMI (kg/m²)</p>
+                  <p className="text-lg font-black text-emerald-900">{bmi}</p>
+                  <p className="text-[9px] font-bold text-emerald-500 mt-1">
+                    {Number(bmi) < 18.5 ? 'Underweight' : Number(bmi) < 25 ? 'Normal' : Number(bmi) < 30 ? 'Overweight' : 'Obese'}
+                  </p>
+                </div>
+              )}
+              {whr && (
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Waist-to-Hip Ratio</p>
+                  <p className="text-lg font-black text-emerald-900">{whr}</p>
+                  <p className="text-[9px] font-bold text-emerald-500 mt-1">
+                    {Number(whr) > 0.9 ? 'Increased risk' : 'Healthy ratio'}
+                  </p>
+                </div>
+              )}
+            </div>
+
             {anthro.height && anthro.waist && (
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                 <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Waist-to-Height Ratio</p>

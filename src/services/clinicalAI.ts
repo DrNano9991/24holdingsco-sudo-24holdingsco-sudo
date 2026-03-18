@@ -343,11 +343,38 @@ export class ClinicalSynthesizer {
         }
 
         // Anthropometry Integration
-        if (patientData.anthro && patientData.anthro.height && patientData.anthro.waist) {
-          const ratio = Number(patientData.anthro.waist) / Number(patientData.anthro.height);
-          if (ratio > 0.5) {
-            summary += `- **Increased Cardiometabolic Risk:** Waist-to-height ratio is ${ratio.toFixed(2)} (Normal < 0.5).\n`;
-            education.push("Discuss weight management and metabolic health optimization");
+        if (patientData.anthro && patientData.anthro.height && (patientData.anthro.waist || patientData.anthro.weight)) {
+          const { waist, height, weight, hip } = patientData.anthro;
+          
+          if (waist && height) {
+            const ratio = Number(waist) / Number(height);
+            if (ratio > 0.5) {
+              summary += `- **Increased Cardiometabolic Risk:** Waist-to-height ratio is ${ratio.toFixed(2)} (Normal < 0.5).\n`;
+              education.push("Discuss weight management and metabolic health optimization");
+            }
+          }
+
+          if (weight && height) {
+            const bmi = ScoringEngine.calculateBMI(weight, height);
+            if (bmi) {
+              summary += `- **Body Mass Index (BMI):** ${bmi} kg/m².\n`;
+              if (bmi >= 30) {
+                summary += `  - **Clinical Note:** Patient is in the obese range, which significantly increases risk for metabolic syndrome and cardiovascular disease.\n`;
+                riskLevel = riskLevel === 'Low' ? 'Moderate' : riskLevel;
+              } else if (bmi < 18.5) {
+                summary += `  - **Clinical Note:** Patient is underweight; assess for nutritional deficiencies or chronic wasting diseases.\n`;
+              }
+            }
+          }
+
+          if (waist && hip) {
+            const whr = ScoringEngine.calculateWHR(waist, hip);
+            if (whr) {
+              summary += `- **Waist-to-Hip Ratio:** ${whr} (Normal < 0.9 for men, < 0.85 for women).\n`;
+              if (whr > 0.9) {
+                summary += `  - **Clinical Note:** Elevated WHR indicates central adiposity and increased metabolic risk.\n`;
+              }
+            }
           }
         }
         summary += `\n`;
