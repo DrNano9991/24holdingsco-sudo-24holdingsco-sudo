@@ -8,7 +8,7 @@ import { BOTTOM_NAV_SECTIONS } from './constants';
 import ScoreCard from './components/ScoreCard';
 import CombinedCalculators from './components/CombinedCalculators';
 import MedicalBackground from './components/MedicalBackground';
-import { clinicalAI, SynthesisResult } from './services/clinicalAI';
+import { clinicalAI, SynthesisResult, SynthesisOptions } from './services/clinicalAI';
 import { ScoringEngine } from './services/scoringEngine';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import TaskList from './components/TaskList';
@@ -33,6 +33,11 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('calculators');
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiInsight, setAiInsight] = useState<SynthesisResult | null>(null);
+  const [synthesisOptions, setSynthesisOptions] = useState<SynthesisOptions>({
+    depth: 'standard',
+    focus: 'diagnostic',
+    includeHandover: true
+  });
   const [consultTab, setConsultTab] = useState<'summary' | 'actions' | 'diagnostics' | 'education' | 'documentation'>('summary');
 
   // --- INACTIVITY LOGIC ---
@@ -170,7 +175,7 @@ const App: React.FC = () => {
     };
     
     try {
-      const result = await clinicalAI.synthesize(primaryType, primaryValue, components, patientContext);
+      const result = await clinicalAI.synthesize(primaryType, primaryValue, components, patientContext, synthesisOptions);
       setAiInsight(result);
       if (isSpeechEnabled && result.summary) {
         // Strip markdown for cleaner speech
@@ -411,8 +416,42 @@ const App: React.FC = () => {
                       <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
                          <h2 className="text-xl font-black text-slate-900 flex items-center gap-2.5 m-0">
                             <Stethoscope className="text-red-600" size={24} /> Clinical Synthesis
+                            {aiInsight.riskLevel && (
+                              <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                                aiInsight.riskLevel === 'Critical' ? 'bg-red-600 text-white animate-pulse' :
+                                aiInsight.riskLevel === 'High' ? 'bg-red-100 text-red-600' :
+                                aiInsight.riskLevel === 'Moderate' ? 'bg-orange-100 text-orange-600' :
+                                'bg-emerald-100 text-emerald-600'
+                              }`}>
+                                {aiInsight.riskLevel} Risk
+                              </span>
+                            )}
                          </h2>
-                         <button onClick={handleConsult} className="text-xs font-bold text-slate-500 hover:text-red-600 transition-all">Regenerate</button>
+                         <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
+                               {(['diagnostic', 'therapeutic', 'educational'] as const).map(f => (
+                                 <button
+                                   key={f}
+                                   onClick={() => setSynthesisOptions({ ...synthesisOptions, focus: f })}
+                                   className={`px-2 py-1 text-[8px] font-black uppercase tracking-tighter rounded-md transition-all ${synthesisOptions.focus === f ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                 >
+                                   {f}
+                                 </button>
+                               ))}
+                            </div>
+                            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
+                               {(['concise', 'standard', 'detailed'] as const).map(d => (
+                                 <button
+                                   key={d}
+                                   onClick={() => setSynthesisOptions({ ...synthesisOptions, depth: d })}
+                                   className={`px-2 py-1 text-[8px] font-black uppercase tracking-tighter rounded-md transition-all ${synthesisOptions.depth === d ? 'bg-white shadow-sm text-red-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                 >
+                                   {d}
+                                 </button>
+                               ))}
+                            </div>
+                            <button onClick={handleConsult} className="text-xs font-bold text-slate-500 hover:text-red-600 transition-all">Regenerate</button>
+                         </div>
                       </div>
                       
                       <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
