@@ -159,11 +159,7 @@ const MedicalBackground: React.FC<Props> = ({ isEyeComfort }) => {
   }, []);
 
   return (
-    <>
-      <div ref={containerRef} className="fixed inset-0 -z-50 pointer-events-none" />
-      <div className="screen-fx fixed inset-0 pointer-events-none -z-40" />
-      <div className="vignette fixed inset-0 pointer-events-none -z-40" />
-    </>
+    <div ref={containerRef} className="fixed inset-0 -z-50 pointer-events-none bg-white" />
   );
 };
 

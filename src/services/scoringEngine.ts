@@ -133,4 +133,34 @@ export class ScoringEngine {
       }
     };
   }
+
+  static calculateARISCAT(state: SurgicalState): number {
+    let score = 0;
+    
+    // Age
+    const age = Number(state.age);
+    if (age >= 80) score += 16;
+    else if (age >= 51) score += 3;
+    
+    // Pre-op SpO2
+    const spo2 = Number(state.preOpSpO2);
+    if (spo2 <= 90) score += 24;
+    else if (spo2 <= 95) score += 8;
+    
+    // Respiratory Infection in last month
+    if (state.respInfection) score += 17;
+    
+    // Pre-op Anemia (Hb <= 10g/dL)
+    if (state.preOpAnemia) score += 11;
+    
+    // Surgical Incision
+    if (state.surgeryType === 'Upper Abdominal') score += 15;
+    else if (state.surgeryType === 'Intrathoracic') score += 24;
+    
+    // Duration of surgery
+    if (state.duration === '2-3h') score += 8;
+    else if (state.duration === '>3h') score += 16;
+    
+    return score;
+  }
 }

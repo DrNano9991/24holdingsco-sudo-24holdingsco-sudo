@@ -164,7 +164,9 @@ const App: React.FC = () => {
       notes,
       ageGroup,
       comorbidities: '',
-      medications: ''
+      medications: '',
+      exam,
+      surgery
     };
     
     try {
@@ -272,7 +274,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <ScoreSummaryPanel gcs={gcs} mews={mews} sirs={sirs} qsofa={qsofa} curb65={curb65} pews={pews} />
+            <ScoreSummaryPanel gcs={gcs} mews={mews} sirs={sirs} qsofa={qsofa} curb65={curb65} pews={pews} surgery={surgery} />
             
             <CombinedCalculators 
               ageGroup={ageGroup}
@@ -281,16 +283,9 @@ const App: React.FC = () => {
               sirs={sirs} setSirs={setSirs}
               qsofa={qsofa} setQsofa={setQsofa}
               pews={pews} setPews={setPews}
+              exam={exam} setExam={setExam}
+              surgery={surgery} setSurgery={setSurgery}
             />
-
-            <div className="flex justify-center gap-4">
-              <button 
-                onClick={() => setShowSaveModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 transition-all"
-              >
-                <Save size={18} /> Save Patient Data
-              </button>
-            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <ScoreCard title="CHA₂DS₂-VASc" subtitle="Stroke Risk in AF" icon={<ShieldCheck size={20} />} score={ScoringEngine.calculateCHADS2VASc(chads)} color="emerald">
@@ -634,6 +629,13 @@ const App: React.FC = () => {
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                 <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Auto-Save Active</span>
               </div>
+              <button 
+                onClick={() => setShowSaveModal(true)} 
+                className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600" 
+                title="Save Patient Data"
+              >
+                <Save size={20} />
+              </button>
               <button onClick={handleAboutPress} className="p-2 rounded-full hover:bg-slate-200/80 transition-all text-slate-600" title="About">
                 <Info size={20} />
               </button>

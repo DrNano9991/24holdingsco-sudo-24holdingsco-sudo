@@ -1,6 +1,6 @@
 import React from 'react';
-import { GCSState, MEWSState, SIRSState, QSOFAState, CURB65State, PEWSState } from '../types';
-import { Brain, Activity, Zap, Baby } from 'lucide-react';
+import { GCSState, MEWSState, SIRSState, QSOFAState, CURB65State, PEWSState, SurgicalState } from '../types';
+import { Brain, Activity, Zap, Baby, Scissors } from 'lucide-react';
 
 import { ScoringEngine } from '../services/scoringEngine';
 
@@ -11,20 +11,22 @@ interface Props {
   qsofa: QSOFAState;
   curb65: CURB65State;
   pews: PEWSState;
+  surgery: SurgicalState;
 }
 
-const ScoreSummaryPanel: React.FC<Props> = ({ gcs, mews, sirs, qsofa, curb65, pews }) => {
+const ScoreSummaryPanel: React.FC<Props> = ({ gcs, mews, sirs, qsofa, curb65, pews, surgery }) => {
   const gcsTotal = ScoringEngine.calculateGCS(gcs);
   const sirsCount = ScoringEngine.calculateSIRS(sirs);
   const qsofaCount = ScoringEngine.calculateQSOFA(qsofa);
   const mewsTotal = ScoringEngine.calculateMEWS(mews);
   const pewsTotal = ScoringEngine.calculatePEWS(pews);
+  const ariscatScore = ScoringEngine.calculateARISCAT(surgery);
 
   const stats = [
     { label: 'GCS', value: gcsTotal, icon: <Brain size={14} />, color: 'indigo' },
     { label: 'MEWS', value: mewsTotal, icon: <Zap size={14} />, color: 'emerald' },
     { label: 'PEWS', value: pewsTotal, icon: <Baby size={14} />, color: 'pink' },
-    { label: 'SIRS', value: sirsCount, icon: <Activity size={14} />, color: 'red' },
+    { label: 'ARISCAT', value: ariscatScore, icon: <Scissors size={14} />, color: 'teal' },
     { label: 'qSOFA', value: qsofaCount, icon: <Zap size={14} />, color: 'orange' },
   ];
 

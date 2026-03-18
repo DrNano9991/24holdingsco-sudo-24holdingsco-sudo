@@ -35,6 +35,8 @@ export class ClinicalSynthesizer {
         PATIENT CONTEXT:
         - Age Group: ${patientData.ageGroup}
         - Clinical Notes: ${patientData.notes || "No additional context provided."}
+        - Physical Exam: ${JSON.stringify(patientData.exam || {})}
+        - Surgical Context: ${JSON.stringify(patientData.surgery || {})}
         
         PRIMARY SCORING DATA:
         - Score System: ${scoreType}
@@ -196,8 +198,33 @@ export class ClinicalSynthesizer {
         }
         break;
 
+      case 'ARISCAT':
+        if (value >= 45) {
+          summary += `**Assessment:** An ARISCAT score of ${value} indicates a **High Risk** of postoperative respiratory complications (~50% risk).\n\n`;
+          actions.push("Pre-operative optimization of respiratory status", "Consider post-operative ICU/HDU admission", "Aggressive chest physiotherapy");
+        } else if (value >= 26) {
+          summary += `**Assessment:** An ARISCAT score of ${value} indicates an **Intermediate Risk** (~13% risk).\n\n`;
+          actions.push("Post-operative incentive spirometry", "Early mobilization");
+        } else {
+          summary += `**Assessment:** An ARISCAT score of ${value} indicates a **Low Risk** (~1.6% risk).\n\n`;
+        }
+        break;
+
       default:
         summary += `**Assessment:** Clinical score of ${value} calculated for ${scoreType}. Please interpret within the full clinical context.\n\n`;
+    }
+
+    // Physical Exam Integration
+    if (patientData.exam) {
+      const { jvp, capRefill, skinTurgor, mucosa } = patientData.exam;
+      if (jvp > 8 || capRefill > 2 || skinTurgor !== 'Normal' || mucosa !== 'Moist') {
+        summary += `**Physical Exam Findings:**\n`;
+        if (jvp > 8) summary += `- Elevated JVP (${jvp} cm): Suggests fluid overload or right heart failure.\n`;
+        if (capRefill > 2) summary += `- Prolonged Capillary Refill (${capRefill}s): Suggests poor peripheral perfusion.\n`;
+        if (skinTurgor !== 'Normal') summary += `- ${skinTurgor} Skin Turgor: Suggests dehydration.\n`;
+        if (mucosa !== 'Moist') summary += `- ${mucosa} Mucosa: Suggests dehydration.\n`;
+        summary += `\n`;
+      }
     }
 
     // Vital Sign Integration
