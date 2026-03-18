@@ -30,7 +30,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ title, subtitle, icon, children, 
           {icon && <div className={`p-2 rounded-lg ${activeColor.split(' ')[0]} ${activeColor.split(' ')[1]}`}>{icon}</div>}
           <div>
             <h3 className="font-black text-slate-900 dark:text-white leading-none text-sm uppercase tracking-wider">{title}</h3>
-            {subtitle && <p className="text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em] mt-1">{subtitle}</p>}
+            {subtitle && <p className="text-[9px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] mt-1">{subtitle}</p>}
           </div>
         </div>
         {score !== undefined && (

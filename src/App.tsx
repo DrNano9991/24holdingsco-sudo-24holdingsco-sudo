@@ -350,7 +350,7 @@ const App: React.FC = () => {
                     { key: 'female', label: 'Female Sex (1)' }
                   ].map(item => (
                     <label key={item.key} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 cursor-pointer hover:bg-slate-100 transition-all border border-slate-200">
-                      <span className="font-bold text-slate-700 text-[11px]">{item.label}</span>
+                      <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{item.label}</span>
                       <input 
                         type="checkbox" 
                         checked={chads[item.key as keyof typeof chads]} 
@@ -384,7 +384,7 @@ const App: React.FC = () => {
                           malignancy: 'Malignancy (1)'
                       }).map(([key, label]) => (
                           <label key={key} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 cursor-pointer hover:bg-slate-100 transition-all border border-slate-200">
-                              <span className="font-bold text-slate-700 text-[11px]">{label}</span>
+                              <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{label}</span>
                               <input type="checkbox" checked={wellsPE[key as keyof typeof wellsPE]} onChange={e => setWellsPE({...wellsPE, [key]: e.target.checked})} className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-white" />
                           </label>
                       ))}

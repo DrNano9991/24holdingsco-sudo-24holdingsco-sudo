@@ -1,6 +1,7 @@
 import { PatientData, MEWSState, SIRSState, QSOFAState, GCSState, Type } from '../types';
 import { ScoringEngine } from './scoringEngine';
 import { GoogleGenAI } from "@google/genai";
+import { MEDICAL_KNOWLEDGE } from './medicalKnowledge';
 
 export interface SynthesisOptions {
   depth?: 'concise' | 'standard' | 'detailed';
@@ -55,6 +56,9 @@ export class ClinicalSynthesizer {
         
         VITAL SIGNS CLASSIFICATION (Reference Ranges):
         ${JSON.stringify(ScoringEngine.classifyVitals(patientData.ageGroup, components.hr || 0, components.rr || 0, components.sbp || 0))}
+
+        CLINICAL KNOWLEDGE BASE (Reference):
+        ${JSON.stringify(MEDICAL_KNOWLEDGE)}
 
         SYNTHESIS OPTIONS:
         - Depth: ${options.depth}
@@ -265,7 +269,26 @@ export class ClinicalSynthesizer {
         break;
 
       default:
-        summary += `**Clinical Impression:** A clinical score of ${value} was calculated using the ${scoreType} system. Please interpret this result within the broader context of the patient's history, physical examination, and clinical trajectory.\n\n`;
+        // Try to find knowledge from the database
+        const key = scoreType.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const knowledge = (MEDICAL_KNOWLEDGE.scores as any)[key];
+        if (knowledge) {
+          summary += `**Clinical Impression (${knowledge.name}):** ${knowledge.description}\n\n`;
+          if (knowledge.recommendations) {
+            actions.push(...knowledge.recommendations);
+          }
+          // Basic risk mapping if possible
+          if (knowledge.interpretation) {
+            const entry = knowledge.interpretation[value] || knowledge.interpretation[String(value)];
+            if (entry) {
+              summary += `**Interpretation:** ${entry.message || entry.risk || ''} (Mortality: ${entry.mortality || 'N/A'})\n\n`;
+              if (entry.risk) riskLevel = entry.risk as any;
+              if (entry.action) actions.push(entry.action);
+            }
+          }
+        } else {
+          summary += `**Clinical Impression:** A clinical score of ${value} was calculated using the ${scoreType} system. Please interpret this result within the broader context of the patient's history, physical examination, and clinical trajectory.\n\n`;
+        }
     }
 
     // Physical Exam Integration
@@ -278,7 +301,7 @@ export class ClinicalSynthesizer {
         
         // Hemodynamic/Fluid Status
         if (jvp > 8) {
-          summary += `- **Elevated JVP (${jvp} cm):** Suggests central venous congestion, potentially due to right heart failure or fluid overload.\n`;
+          summary += `- **Elevated JVP (${jvp} mmHg):** Suggests central venous congestion, potentially due to right heart failure or fluid overload.\n`;
           actions.push("Assess for peripheral edema and hepatomegaly", "Consider diuretic therapy if fluid overloaded");
         }
         if (capRefill > 2) {
