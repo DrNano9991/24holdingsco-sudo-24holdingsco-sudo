@@ -3,9 +3,10 @@ import * as THREE from 'three';
 
 interface Props {
   isEyeComfort?: boolean;
+  theme?: 'default' | 'emerald' | 'rose' | 'amber';
 }
 
-const MedicalBackground: React.FC<Props> = ({ isEyeComfort }) => {
+const MedicalBackground: React.FC<Props> = ({ isEyeComfort, theme = 'default' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,7 +40,16 @@ const MedicalBackground: React.FC<Props> = ({ isEyeComfort }) => {
     fillLight.position.set(-10, 5, 15);
     scene.add(fillLight);
 
-    const blueRim = new THREE.PointLight(0x0891b2, 0.8, 30);
+    const themeColors = {
+      default: 0x0ea5e9, // sky-500
+      emerald: 0x10b981, // emerald-500
+      rose: 0xf43f5e,    // rose-500
+      amber: 0xf59e0b    // amber-500
+    };
+
+    const accentColor = themeColors[theme];
+
+    const blueRim = new THREE.PointLight(accentColor, 0.8, 30);
     blueRim.position.set(-8, 5, 8);
     scene.add(blueRim);
 
@@ -51,7 +61,7 @@ const MedicalBackground: React.FC<Props> = ({ isEyeComfort }) => {
     }
     pGeom.setAttribute('position', new THREE.Float32BufferAttribute(pPos, 3));
     const particles = new THREE.Points(pGeom, new THREE.PointsMaterial({ 
-      color: 0xcbd5e1, 
+      color: accentColor, 
       size: 0.04, 
       transparent: true, 
       opacity: 0.2 
@@ -64,8 +74,8 @@ const MedicalBackground: React.FC<Props> = ({ isEyeComfort }) => {
     scene.add(dnaGroup);
 
     const DNA_BACKBONE_COLOR = 0x94a3b8; // slate-400
-    const AT_COLOR = 0xf43f5e; // rose-500
-    const GC_COLOR = 0x0ea5e9; // sky-500
+    const AT_COLOR = accentColor;
+    const GC_COLOR = 0x94a3b8; 
 
     const radius = 3.2;
     const height = 24;
@@ -156,7 +166,7 @@ const MedicalBackground: React.FC<Props> = ({ isEyeComfort }) => {
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
     };
-  }, []);
+  }, [theme]);
 
   return (
     <div ref={containerRef} className="fixed inset-0 -z-50 pointer-events-none bg-white" />

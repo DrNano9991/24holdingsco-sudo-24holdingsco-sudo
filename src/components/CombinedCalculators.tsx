@@ -19,14 +19,12 @@ interface Props {
   setQsofa: (val: QSOFAState) => void;
   pews: PEWSState;
   setPews: (val: PEWSState) => void;
-  exam: ExamState;
-  setExam: (val: ExamState) => void;
   surgery: SurgicalState;
   setSurgery: (val: SurgicalState) => void;
 }
 
 const CombinedCalculators: React.FC<Props> = ({ 
-  ageGroup, gcs, setGcs, mews, setMews, sirs, setSirs, qsofa, setQsofa, pews, setPews, exam, setExam, surgery, setSurgery 
+  ageGroup, gcs, setGcs, mews, setMews, sirs, setSirs, qsofa, setQsofa, pews, setPews, surgery, setSurgery 
 }) => {
   const gcsTotal = ScoringEngine.calculateGCS(gcs);
   const vitalsClass = ScoringEngine.classifyVitals(ageGroup, mews.hr, mews.rr, mews.sbp);
@@ -245,88 +243,6 @@ const CombinedCalculators: React.FC<Props> = ({
               <span className="text-[10px] font-bold text-slate-600">Vomiting</span>
               <input type="checkbox" checked={pews.persistentVomiting} onChange={e => setPews({...pews, persistentVomiting: e.target.checked})} className="h-4 w-4 text-pink-600 bg-white border-slate-300" />
             </label>
-          </div>
-        </div>
-      </ScoreCard>
-
-      {/* Physical Exam Details */}
-      <ScoreCard title="Physical Exam" subtitle="Clinical Findings" icon={<User size={20} />} color="slate">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">JVP (cm H2O)</label>
-              <input 
-                type="number" 
-                value={exam.jvp} 
-                onChange={e => setExam({...exam, jvp: e.target.value === '' ? '' : Number(e.target.value)})}
-                className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-slate-400 transition-all"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Capillary Refill (s)</label>
-              <input 
-                type="number" 
-                value={exam.capRefill} 
-                onChange={e => setExam({...exam, capRefill: e.target.value === '' ? '' : Number(e.target.value)})}
-                className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-slate-400 transition-all"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Skin Turgor</label>
-              <select 
-                value={exam.skinTurgor} 
-                onChange={e => setExam({...exam, skinTurgor: e.target.value})}
-                className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-slate-400 transition-all"
-              >
-                <option value="Normal">Normal</option>
-                <option value="Poor">Poor</option>
-                <option value="Very Poor">Very Poor</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Mucosa</label>
-              <select 
-                value={exam.mucosa} 
-                onChange={e => setExam({...exam, mucosa: e.target.value})}
-                className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-slate-400 transition-all"
-              >
-                <option value="Moist">Moist</option>
-                <option value="Dry">Dry</option>
-                <option value="Parched">Parched</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Pulse Grade (0-3)</label>
-              <div className="flex gap-1">
-                {[0, 1, 2, 3].map(v => (
-                  <button 
-                    key={v} 
-                    onClick={() => setExam({...exam, pulseGrade: v})}
-                    className={`flex-1 p-2 rounded-lg border-2 text-xs font-bold transition-all ${exam.pulseGrade === v ? 'border-slate-600 bg-slate-600/20 text-slate-900' : 'border-slate-200 bg-white text-slate-600'}`}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Muscle Strength (0-5)</label>
-              <div className="flex gap-1">
-                {[0, 1, 2, 3, 4, 5].map(v => (
-                  <button 
-                    key={v} 
-                    onClick={() => setExam({...exam, muscleStrength: v})}
-                    className={`flex-1 p-1 rounded-lg border-2 text-[10px] font-bold transition-all ${exam.muscleStrength === v ? 'border-slate-600 bg-slate-600/20 text-slate-900' : 'border-slate-200 bg-white text-slate-600'}`}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </ScoreCard>

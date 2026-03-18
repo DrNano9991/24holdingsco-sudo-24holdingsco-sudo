@@ -7,6 +7,7 @@ import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, Surg
 import { BOTTOM_NAV_SECTIONS } from './constants';
 import ScoreCard from './components/ScoreCard';
 import CombinedCalculators from './components/CombinedCalculators';
+import PhysicalExam from './components/PhysicalExam';
 import MedicalBackground from './components/MedicalBackground';
 import { clinicalAI, SynthesisResult, SynthesisOptions } from './services/clinicalAI';
 import { ScoringEngine } from './services/scoringEngine';
@@ -171,6 +172,8 @@ const App: React.FC = () => {
       comorbidities: '',
       medications: '',
       exam,
+      liver,
+      anthro,
       surgery
     };
     
@@ -178,9 +181,7 @@ const App: React.FC = () => {
       const result = await clinicalAI.synthesize(primaryType, primaryValue, components, patientContext, synthesisOptions);
       setAiInsight(result);
       if (isSpeechEnabled && result.summary) {
-        // Strip markdown for cleaner speech
-        const cleanSummary = result.summary.replace(/[#*`_~]/g, '');
-        speechService.speak(cleanSummary);
+        speechService.speak(result.summary);
       }
     } catch (e) {
       console.error(e);
@@ -232,6 +233,50 @@ const App: React.FC = () => {
     const timer = setTimeout(() => setIsSplashing(false), 2500);
     return () => clearTimeout(timer);
   }, []);
+
+  // --- PERIODIC CLINICAL UPDATES ---
+  useEffect(() => {
+    if (isSplashing) return;
+
+    const speakUpdate = () => {
+      if (!isSpeechEnabled) return;
+
+      const now = new Date();
+      const hour = now.getHours();
+      let greeting = "Good morning";
+      if (hour >= 12 && hour < 17) greeting = "Good afternoon";
+      if (hour >= 17) greeting = "Good evening";
+
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      // Get tasks from localStorage
+      const storedTasks = localStorage.getItem('ai-medica-tasks');
+      const tasks = storedTasks ? JSON.parse(storedTasks) : [];
+      const ongoing = tasks.filter((t: any) => !t.completed).length;
+      const completed = tasks.filter((t: any) => t.completed).length;
+
+      let taskStatus = "";
+      if (tasks.length > 0) {
+        taskStatus = ` You have ${ongoing} ongoing clinical tasks and ${completed} completed tasks in your list.`;
+      } else {
+        taskStatus = " Your task list is currently empty.";
+      }
+
+      const message = `${greeting}. The current time is ${timeStr}.${taskStatus} How can I assist you with your clinical rounds today?`;
+      speechService.speak(message);
+    };
+
+    // Speak once after splash
+    const initialTimer = setTimeout(speakUpdate, 2000);
+
+    // Then every 15 minutes
+    const interval = setInterval(speakUpdate, 15 * 60 * 1000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [isSplashing, isSpeechEnabled]);
 
   if (isSplashing) {
     return (
@@ -288,7 +333,6 @@ const App: React.FC = () => {
               sirs={sirs} setSirs={setSirs}
               qsofa={qsofa} setQsofa={setQsofa}
               pews={pews} setPews={setPews}
-              exam={exam} setExam={setExam}
               surgery={surgery} setSurgery={setSurgery}
             />
 
@@ -348,6 +392,14 @@ const App: React.FC = () => {
               </ScoreCard>
             </div>
           </div>
+        );
+      case 'exam':
+        return (
+          <PhysicalExam 
+            exam={exam} setExam={setExam}
+            liver={liver} setLiver={setLiver}
+            anthro={anthro} setAnthro={setAnthro}
+          />
         );
       case 'patients':
         return (
@@ -592,11 +644,13 @@ const App: React.FC = () => {
 
             <div className="space-y-6">
               <div className="prose prose-slate">
-                <p className="text-sm text-slate-600 leading-relaxed italic">
-                  "This app is a product of Competence based learning and co-curricular activities of King Ceasor University School of Medicine developed by Arinda Andrew Besigye MBChB 3.1. 
-                  I have been inspired by The King's (King Ceasor The Great) visualization and whole perception of Technology."
-                </p>
-                <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-widest">— With Commentary advisory from His Classmates</p>
+                <div className="mb-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Project Attribution</p>
+                  <p className="text-xs text-slate-600 leading-relaxed italic">
+                    This application is a practical expression of the Competence-Based Medical Education at King Ceasor University, where learning is defined by the ability to solve real-world health challenges. Developed by Arinda Andrew Besigye (MBChB 3.1), the tool is a tribute to the technological foresight of HM King Ceasor Augustus Mulenga, whose vision for innovation empowers students to bridge the gap between medicine and digital transformation.
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-widest">Refined through the collaborative insights and clinical peer review of the MBChB 3.1 class.</p>
+                </div>
               </div>
 
               <div className="bg-orange-50 border border-orange-100 rounded-2xl p-5">
@@ -605,8 +659,7 @@ const App: React.FC = () => {
                   <span className="text-[10px] font-black uppercase tracking-widest">Clinical Disclaimer</span>
                 </div>
                 <p className="text-[11px] text-orange-800 font-medium leading-relaxed">
-                  This tool is only a clinical scoring calculator. It is intended solely for aiding decision making among well-trained and licensed clinical practitioners. 
-                  It does not make final interventional decision commands and should not replace professional clinical judgment.
+                  This tool is designed to support, not dictate, clinical excellence. It functions strictly as a decision-support calculator for licensed practitioners. It is not an interventional authority and must always be used in conjunction with professional clinical judgment and patient-centered care.
                 </p>
               </div>
 
@@ -694,29 +747,6 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         {renderContent()}
-
-        {/* Attribution & Disclaimer */}
-        <div className="mt-12 pt-8 border-t border-slate-200 text-center space-y-6">
-          <div className="max-w-2xl mx-auto">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Project Attribution</p>
-            <p className="text-xs text-slate-600 leading-relaxed italic">
-              "This app is a product of Competence based learning and co-cirricular activities of King Ceasor University School of Medicine developed by Arinda Andrew Besigye MBChB 3.1. 
-              I have been inspired by The King's (King Ceasor The Great) visualization and whole perception of Technology."
-            </p>
-            <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-widest">— With Commentary advisory from His Classmates</p>
-          </div>
-          
-          <div className="bg-orange-50 border border-orange-100 rounded-2xl p-6 max-w-2xl mx-auto">
-            <div className="flex items-center justify-center gap-2 text-orange-600 mb-2">
-              <AlertTriangle size={16} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Clinical Disclaimer</span>
-            </div>
-            <p className="text-[11px] text-orange-800 font-medium leading-relaxed">
-              This tool is only a clinical scoring calculator. It is intended solely for aiding decision making among well-trained and licensed clinical practitioners. 
-              It does not make final interventional decision commands and should not replace professional clinical judgment.
-            </p>
-          </div>
-        </div>
       </main>
 
       {/* Mobile Bottom Nav - Only visible on small screens */}

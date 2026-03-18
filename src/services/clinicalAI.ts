@@ -44,6 +44,8 @@ export class ClinicalSynthesizer {
         - Age Group: ${patientData.ageGroup}
         - Clinical Notes: ${patientData.notes || "No additional context provided."}
         - Physical Exam: ${JSON.stringify(patientData.exam || {})}
+        - Liver Findings: ${JSON.stringify(patientData.liver || {})}
+        - Anthropometry: ${JSON.stringify(patientData.anthro || {})}
         - Surgical Context: ${JSON.stringify(patientData.surgery || {})}
         
         PRIMARY SCORING DATA:
@@ -314,6 +316,15 @@ export class ClinicalSynthesizer {
             summary += `- **Hepatic Encephalopathy (Grade ${liver.encephalopathy === 2 ? '1-2' : '3-4'}):** Significant neuro-metabolic complication.\n`;
             riskLevel = liver.encephalopathy === 3 ? 'Critical' : 'High';
             actions.push("Initiate Lactulose and Rifaximin", "Monitor airway if GCS drops");
+          }
+        }
+
+        // Anthropometry Integration
+        if (patientData.anthro && patientData.anthro.height && patientData.anthro.waist) {
+          const ratio = Number(patientData.anthro.waist) / Number(patientData.anthro.height);
+          if (ratio > 0.5) {
+            summary += `- **Increased Cardiometabolic Risk:** Waist-to-height ratio is ${ratio.toFixed(2)} (Normal < 0.5).\n`;
+            education.push("Discuss weight management and metabolic health optimization");
           }
         }
         summary += `\n`;

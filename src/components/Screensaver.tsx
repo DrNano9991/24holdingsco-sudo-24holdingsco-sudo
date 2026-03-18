@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import MedicalBackground from './MedicalBackground';
 import ECGAnimation from './ECGAnimation';
 import { Activity, ShieldAlert } from 'lucide-react';
 
 const Screensaver: React.FC = () => {
+  const [theme, setTheme] = useState<'default' | 'emerald' | 'rose' | 'amber'>('default');
+  const themes: ('default' | 'emerald' | 'rose' | 'amber')[] = ['default', 'emerald', 'rose', 'amber'];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTheme(prev => {
+        const currentIndex = themes.indexOf(prev);
+        return themes[(currentIndex + 1) % themes.length];
+      });
+    }, 8000); // Cycle every 8 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[200] bg-[#f8fafc] flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-1000">
       {/* Intense DNA Background */}
       <div className="absolute inset-0 opacity-100">
-        <MedicalBackground />
+        <MedicalBackground theme={theme} />
       </div>
 
       {/* Content Overlay */}

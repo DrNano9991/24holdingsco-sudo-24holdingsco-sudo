@@ -117,4 +117,5 @@ export interface PatientData {
   pews: PEWSState;
   ageGroup: AgeGroup;
   notes: string;
+  anthro?: { waist: number | ''; height: number | ''; };
 }
