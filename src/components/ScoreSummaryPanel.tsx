@@ -34,13 +34,13 @@ const ScoreSummaryPanel: React.FC<Props> = ({ gcs, mews, sirs, qsofa, curb65, pe
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {stats.map((stat) => (
-        <div key={stat.label} className="material-card p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition-all border border-slate-200 bg-white">
-          <div className="text-slate-500 group-hover:text-red-500 transition-colors mb-2">{stat.icon}</div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white leading-none">{stat.value}</div>
-          <div className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] mt-2">{stat.label}</div>
-          <div className={`w-1 h-1 rounded-full mt-2 bg-${stat.color}-500 shadow-[0_0_8px_rgba(0,0,0,0.2)]`} />
+        <div key={stat.label} className="bg-white border border-border p-2 flex flex-col items-center justify-center text-center transition-none">
+          <div className="text-slate-400 mb-1">{stat.icon}</div>
+          <div className="text-lg font-bold text-slate-800 leading-none">{stat.value}</div>
+          <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1">{stat.label}</div>
+          <div className={`w-2 h-2 border border-border mt-2 bg-gradient-to-br from-${stat.color}-400 to-${stat.color}-600`} />
         </div>
       ))}
     </div>

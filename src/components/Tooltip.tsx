@@ -12,9 +12,8 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
     <div className="relative inline-block" onMouseEnter={() => setIsVisible(true)} onMouseLeave={() => setIsVisible(false)}>
       {children}
       {isVisible && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-bold rounded-lg shadow-xl whitespace-normal w-48 text-center border border-white/10 backdrop-blur-md">
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#FFFFE1] text-slate-800 text-[9px] font-medium border border-slate-400 shadow-none whitespace-normal w-48 text-center transition-none">
           {text}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
         </div>
       )}
     </div>

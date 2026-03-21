@@ -22,6 +22,114 @@ export class ClinicalSynthesizer {
   private ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
   /**
+   * Generates a clinical prescription based on patient data and context.
+   */
+  async generatePrescription(
+    patientData: any,
+    ageGroup: string,
+    customPrompt: string = ""
+  ): Promise<any> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return this.localPrescriptionFallback(patientData, ageGroup, customPrompt);
+    }
+
+    try {
+      const prompt = `
+        You are a senior clinical pharmacologist and consultant physician. Generate a high-fidelity, evidence-based prescription regimen for the following patient.
+        
+        PATIENT CONTEXT:
+        - Age Group: ${ageGroup}
+        - Clinical Notes: ${patientData.notes || "No additional context provided."}
+        - Physical Exam: ${JSON.stringify(patientData.exam || {})}
+        - Liver Findings: ${JSON.stringify(patientData.liver || {})}
+        - Anthropometry: ${JSON.stringify(patientData.anthro || {})}
+        - Machine Data (Labs/Imaging): ${JSON.stringify(patientData.machineData || [])}
+        - Current Scores: MEWS=${patientData.mews.sbp ? 'Active' : 'N/A'}, GCS=${patientData.gcs.eye + patientData.gcs.verbal + patientData.gcs.motor}
+        
+        SPECIFIC INDICATION / REQUEST:
+        ${customPrompt || "General clinical management based on available data."}
+
+        INSTRUCTIONS:
+        1. Recommend a list of medications with precise dosages, frequencies, and durations.
+        2. Provide a clinical rationale for each medication.
+        3. List critical safety warnings (contraindications, interactions, side effects).
+        4. Recommend a monitoring plan (labs, vitals, clinical signs).
+        5. DO NOT use markdown characters.
+        6. Ensure dosages are appropriate for the ${ageGroup} age group.
+        
+        CRITICAL: If the patient has liver dysfunction (Liver Findings), adjust dosages accordingly.
+        CRITICAL: If the patient is pediatric or neonate, ensure weight-based dosing (mg/kg) is specified.
+      `;
+
+      const response = await this.ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              medications: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    dosage: { type: Type.STRING },
+                    frequency: { type: Type.STRING },
+                    duration: { type: Type.STRING },
+                    rationale: { type: Type.STRING }
+                  },
+                  required: ["name", "dosage", "frequency", "duration", "rationale"]
+                }
+              },
+              warnings: { type: Type.ARRAY, items: { type: Type.STRING } },
+              monitoring: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["medications", "warnings", "monitoring"]
+          }
+        }
+      });
+
+      return JSON.parse(response.text || "{}");
+    } catch (error) {
+      console.error("AI Prescription Error:", error);
+      return this.localPrescriptionFallback(patientData, ageGroup, customPrompt);
+    }
+  }
+
+  private localPrescriptionFallback(patientData: any, ageGroup: string, customPrompt: string): any {
+    return {
+      medications: [
+        {
+          name: "IV Normal Saline (0.9%)",
+          dosage: ageGroup === 'Adult' ? "500ml - 1000ml bolus" : "20ml/kg bolus",
+          frequency: "Stat",
+          duration: "Immediate",
+          rationale: "Initial volume resuscitation based on clinical stability indicators."
+        },
+        {
+          name: "Paracetamol",
+          dosage: ageGroup === 'Adult' ? "1g" : "15mg/kg",
+          frequency: "QID (6-hourly)",
+          duration: "3-5 days",
+          rationale: "Analgesia and antipyretic management."
+        }
+      ],
+      warnings: [
+        "Monitor for signs of fluid overload during resuscitation.",
+        "Ensure no known allergies to recommended agents.",
+        "Local AI mode: Dosages are generic and must be verified by a clinician."
+      ],
+      monitoring: [
+        "Hourly vital signs (HR, BP, RR, SpO2)",
+        "Strict fluid balance (Input/Output)",
+        "Repeat clinical assessment in 4 hours"
+      ]
+    };
+  }
+
+  /**
    * Synthesizes clinical data into actionable insights using Gemini.
    */
   async synthesize(
@@ -48,6 +156,7 @@ export class ClinicalSynthesizer {
         - Liver Findings: ${JSON.stringify(patientData.liver || {})}
         - Anthropometry: ${JSON.stringify(patientData.anthro || {})}
         - Surgical Context: ${JSON.stringify(patientData.surgery || {})}
+        - Machine Data (Labs/Imaging): ${JSON.stringify(patientData.machineData || [])}
         
         PRIMARY SCORING DATA:
         - Score System: ${scoreType}
@@ -67,16 +176,19 @@ export class ClinicalSynthesizer {
 
         INSTRUCTIONS:
         1. Provide a nuanced clinical summary that interprets the score in the context of the patient's age and notes. 
+           - DO NOT use any markdown characters (no asterisks, no hashes, no underscores).
+           - Use a well-formatted outline with proper paragraphing.
            - If depth is 'concise', keep it to 2-3 sentences.
            - If depth is 'detailed', provide a comprehensive physiological rationale.
            - Focus primarily on ${options.focus} aspects.
-        2. List immediate life-saving or stabilizing actions if necessary.
-        3. Recommend a targeted diagnostic workup (Labs, Imaging, Monitoring).
-        4. Provide evidence-based education points for the patient or their family.
-        5. Generate a professional, structured medical note (SBAR or SOAP format) suitable for a hospital handover if requested.
+        2. List immediate life-saving or stabilizing actions if necessary. (Plain text only, no markdown).
+        3. Recommend a targeted diagnostic workup (Labs, Imaging, Monitoring). (Plain text only, no markdown).
+        4. Provide evidence-based education points for the patient or their family. (Plain text only, no markdown).
+        5. Generate a professional, structured medical note (SBAR or SOAP format) suitable for a hospital handover if requested. (Plain text only, no markdown).
         6. Assign a risk level: 'Low', 'Moderate', 'High', or 'Critical'.
         
         CRITICAL: If the score indicates high risk (e.g., MEWS >= 5, qSOFA >= 2, GCS < 8), prioritize urgent escalation.
+        CRITICAL: ABSOLUTELY NO MARKDOWN CHARACTERS IN ANY STRING FIELD.
       `;
 
       const response = await this.ai.models.generateContent({

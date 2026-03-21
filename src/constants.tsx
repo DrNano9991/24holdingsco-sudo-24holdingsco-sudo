@@ -6,7 +6,10 @@ import {
   Stethoscope,
   AlertCircle,
   Eye,
-  Calculator
+  Calculator,
+  FileText,
+  Folder,
+  ClipboardList
 } from 'lucide-react';
 
 export const GCS_OPTIONS = {
@@ -34,10 +37,11 @@ export const GCS_OPTIONS = {
 };
 
 export const BOTTOM_NAV_SECTIONS = [
-  { id: 'calculators', name: 'Scoring', icon: <Calculator size={24} /> },
-  { id: 'exam', name: 'Exam', icon: <Eye size={24} /> },
-  { id: 'tasks', name: 'Tasks', icon: <AlertCircle size={24} /> },
-  { id: 'summary', name: 'AI Consult', icon: <Brain size={24} /> },
+  { id: 'calculators', name: 'Scoring', icon: <FileText size={24} className="text-blue-500" /> },
+  { id: 'exam', name: 'Exam', icon: <Folder size={24} className="text-yellow-500" /> },
+  { id: 'diagnostics', name: 'Diagnostics', icon: <Activity size={24} className="text-red-500" /> },
+  { id: 'tasks', name: 'Tasks', icon: <ClipboardList size={24} className="text-green-500" /> },
+  { id: 'summary', name: 'AI Consult', icon: <Brain size={24} className="text-purple-500" /> },
 ];
 
 

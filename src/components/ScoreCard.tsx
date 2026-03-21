@@ -22,24 +22,25 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ title, subtitle, icon, children, 
   };
 
   const activeColor = colorClasses[color] || colorClasses.red;
+  const isSelected = score !== undefined && score !== 0 && score !== '15' && score !== '0';
 
   return (
-    <div className="material-card rounded-2xl overflow-hidden flex flex-col h-full group transition-all">
-      <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
-        <div className="flex items-center gap-3">
-          {icon && <div className={`p-2 rounded-lg ${activeColor.split(' ')[0]} ${activeColor.split(' ')[1]}`}>{icon}</div>}
+    <div className={`score-card bg-white border border-border flex flex-col h-full transition-all ${isSelected ? 'selected' : ''}`}>
+      <div className="p-2 border-b border-border flex justify-between items-center bg-[#F3F3F3] dark:bg-slate-800">
+        <div className="flex items-center gap-2">
+          {icon && <div className={`p-1 border border-border ${activeColor.split(' ')[0]} ${activeColor.split(' ')[1]}`}>{icon}</div>}
           <div>
-            <h3 className="font-black text-slate-900 dark:text-white leading-none text-sm uppercase tracking-wider">{title}</h3>
-            {subtitle && <p className="text-[9px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] mt-1">{subtitle}</p>}
+            <h3 className="font-bold text-slate-800 leading-none text-[11px] uppercase tracking-tight">{title}</h3>
+            {subtitle && <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{subtitle}</p>}
           </div>
         </div>
         {score !== undefined && (
-          <div className={`w-10 h-10 flex items-center justify-center rounded-xl font-black text-lg shadow-lg border-2 ${activeColor} dark:text-white`}>
+          <div className={`w-7 h-7 flex items-center justify-center border border-border font-bold text-sm ${activeColor}`}>
             {score}
           </div>
         )}
       </div>
-      <div className="p-5 flex-1">
+      <div className="p-3 flex-1">
         {children}
       </div>
     </div>

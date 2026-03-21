@@ -159,6 +159,13 @@ export const translations = {
     tachypnea: 'Tachypnea',
     hypotension: 'Hypotension',
     hypertension: 'Hypertension',
+    diagnosticImport: 'Diagnostic Import',
+    importData: 'Import Data',
+    noDiagnosticData: 'No diagnostic data imported yet',
+    aiInterpreting: 'AI INTERPRETING DATA...',
+    analyzeWithAI: 'ANALYZE WITH CLINICAL AI',
+    recentInterpretations: 'Recent Interpretations',
+    aiInterpretation: 'AI Interpretation',
   },
   sw: {
     appName: 'AI Medica UG',
@@ -318,5 +325,12 @@ export const translations = {
     tachypnea: 'Tachypnea',
     hypotension: 'Hypotension',
     hypertension: 'Hypertension',
+    diagnosticImport: 'Pakia Vipimo',
+    importData: 'Pakia Data',
+    noDiagnosticData: 'Hakuna data ya vipimo iliyopakiwa bado',
+    aiInterpreting: 'AI INACHAMBUA DATA...',
+    analyzeWithAI: 'CHAMBUA NA CLINICAL AI',
+    recentInterpretations: 'Ufafanuzi wa Hivi Karibuni',
+    aiInterpretation: 'Ufafanuzi wa AI',
   }
 };

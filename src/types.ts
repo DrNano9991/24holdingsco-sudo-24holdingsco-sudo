@@ -106,6 +106,17 @@ export interface CHADS2VAScState {
   female: boolean;
 }
 
+export interface MachineData {
+  id: string;
+  type: 'CBC' | 'GeneXpert' | 'Truenat' | 'X-ray' | 'Glucometer' | 'PulseOx' | 'ECG' | 'Other';
+  timestamp: string;
+  rawContent: string; // Base64 for images, text for others
+  mimeType?: string;
+  interpretation?: string;
+  metadata?: Record<string, any>;
+  deviceName?: string;
+}
+
 export interface PatientData {
   gcs: GCSState;
   sirs: SIRSState;
@@ -120,6 +131,7 @@ export interface PatientData {
   ageGroup: AgeGroup;
   notes: string;
   anthro?: { waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; };
+  machineData?: MachineData[];
 }
 
 export interface Task {

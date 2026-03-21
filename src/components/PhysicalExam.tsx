@@ -21,10 +21,10 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
   const whr = (anthro.waist && anthro.hip) ? (Number(anthro.waist) / Number(anthro.hip)).toFixed(2) : null;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 transition-none">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-          <User className="text-red-600" /> Physical Examination
+        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 uppercase tracking-tight">
+          <User className="text-primary" /> Physical Examination
         </h2>
       </div>
 
@@ -39,7 +39,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   type="number" 
                   value={exam.jvp} 
                   onChange={e => setExam({...exam, jvp: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                   placeholder="e.g. 7"
                 />
               </div>
@@ -49,7 +49,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   type="number" 
                   value={exam.capRefill} 
                   onChange={e => setExam({...exam, capRefill: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                   placeholder="e.g. 2"
                 />
               </div>
@@ -60,7 +60,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                 <select 
                   value={exam.skinTurgor} 
                   onChange={e => setExam({...exam, skinTurgor: e.target.value})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                 >
                   <option value="Normal">Normal</option>
                   <option value="Poor">Poor</option>
@@ -72,7 +72,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                 <select 
                   value={exam.mucosa} 
                   onChange={e => setExam({...exam, mucosa: e.target.value})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                 >
                   <option value="Moist">Moist</option>
                   <option value="Dry">Dry</option>
@@ -88,12 +88,12 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Pulse Grade (0-3)</label>
-              <div className="flex gap-1">
+              <div className="flex gap-0 border border-border">
                 {[0, 1, 2, 3].map(v => (
                   <button 
                     key={v} 
                     onClick={() => setExam({...exam, pulseGrade: v})}
-                    className={`flex-1 p-3 rounded-xl border-2 text-sm font-black transition-all ${exam.pulseGrade === v ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-sm font-bold transition-none ${exam.pulseGrade === v ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {v}+
                   </button>
@@ -108,12 +108,12 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Muscle Strength (0-5)</label>
-              <div className="flex gap-1">
+              <div className="flex gap-0 border border-border">
                 {[0, 1, 2, 3, 4, 5].map(v => (
                   <button 
                     key={v} 
                     onClick={() => setExam({...exam, muscleStrength: v})}
-                    className={`flex-1 p-2 rounded-xl border-2 text-xs font-black transition-all ${exam.muscleStrength === v ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-xs font-bold transition-none ${exam.muscleStrength === v ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {v}
                   </button>
@@ -136,7 +136,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Ascites</label>
-              <div className="flex gap-1">
+              <div className="flex gap-0 border border-border">
                 {[
                   { value: 1, label: 'None' },
                   { value: 2, label: 'Mild' },
@@ -145,7 +145,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   <button 
                     key={opt.value} 
                     onClick={() => setLiver({...liver, ascites: opt.value})}
-                    className={`flex-1 p-3 rounded-xl border-2 text-[10px] font-black transition-all ${liver.ascites === opt.value ? 'border-orange-600 bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-[10px] font-bold transition-none ${liver.ascites === opt.value ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {opt.label}
                   </button>
@@ -154,7 +154,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Encephalopathy</label>
-              <div className="flex gap-1">
+              <div className="flex gap-0 border border-border">
                 {[
                   { value: 1, label: 'None' },
                   { value: 2, label: 'Grade 1-2' },
@@ -163,12 +163,23 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   <button 
                     key={opt.value} 
                     onClick={() => setLiver({...liver, encephalopathy: opt.value})}
-                    className={`flex-1 p-3 rounded-xl border-2 text-[10px] font-black transition-all ${liver.encephalopathy === opt.value ? 'border-orange-600 bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-[10px] font-bold transition-none ${liver.encephalopathy === opt.value ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-white border border-border">
+              <label className="text-[10px] font-black text-slate-600 uppercase">Dialysis (≥2x/week)</label>
+              <select 
+                value={liver.dialysis ? 'yes' : 'no'} 
+                onChange={e => setLiver({...liver, dialysis: e.target.value === 'yes'})}
+                className="p-1 bg-white border border-border font-bold text-[10px] outline-none focus:border-primary"
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
             </div>
           </div>
         </ScoreCard>
@@ -183,7 +194,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   type="number" 
                   value={anthro.weight} 
                   onChange={e => setAnthro({...anthro, weight: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                   placeholder="e.g. 70"
                 />
               </div>
@@ -193,7 +204,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   type="number" 
                   value={anthro.height} 
                   onChange={e => setAnthro({...anthro, height: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                   placeholder="e.g. 175"
                 />
               </div>
@@ -205,7 +216,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   type="number" 
                   value={anthro.waist} 
                   onChange={e => setAnthro({...anthro, waist: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                   placeholder="e.g. 90"
                 />
               </div>
@@ -215,7 +226,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   type="number" 
                   value={anthro.hip} 
                   onChange={e => setAnthro({...anthro, hip: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 transition-all"
+                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
                   placeholder="e.g. 100"
                 />
               </div>
@@ -223,19 +234,19 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {bmi && (
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">BMI (kg/m²)</p>
-                  <p className="text-lg font-black text-emerald-900">{bmi}</p>
-                  <p className="text-[9px] font-bold text-emerald-500 mt-1">
+                <div className="p-2 bg-white border border-border">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">BMI (kg/m²)</p>
+                  <p className="text-base font-bold text-slate-800">{bmi}</p>
+                  <p className="text-[9px] font-bold text-slate-400 mt-0.5">
                     {Number(bmi) < 18.5 ? 'Underweight' : Number(bmi) < 25 ? 'Normal' : Number(bmi) < 30 ? 'Overweight' : 'Obese'}
                   </p>
                 </div>
               )}
               {whr && (
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Waist-to-Hip Ratio</p>
-                  <p className="text-lg font-black text-emerald-900">{whr}</p>
-                  <p className="text-[9px] font-bold text-emerald-500 mt-1">
+                <div className="p-2 bg-white border border-border">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Waist-to-Hip Ratio</p>
+                  <p className="text-base font-bold text-slate-800">{whr}</p>
+                  <p className="text-[9px] font-bold text-slate-400 mt-0.5">
                     {Number(whr) > 0.9 ? 'Increased risk' : 'Healthy ratio'}
                   </p>
                 </div>
@@ -243,10 +254,10 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
             </div>
 
             {anthro.height && anthro.waist && (
-              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Waist-to-Height Ratio</p>
-                <p className="text-lg font-black text-emerald-900">{(Number(anthro.waist) / Number(anthro.height)).toFixed(2)}</p>
-                <p className="text-[9px] font-bold text-emerald-500 mt-1">
+              <div className="p-2 bg-white border border-border">
+                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Waist-to-Height Ratio</p>
+                <p className="text-base font-bold text-slate-800">{(Number(anthro.waist) / Number(anthro.height)).toFixed(2)}</p>
+                <p className="text-[9px] font-bold text-slate-400 mt-0.5">
                   {(Number(anthro.waist) / Number(anthro.height)) > 0.5 ? 'Increased cardiometabolic risk' : 'Healthy ratio'}
                 </p>
               </div>
