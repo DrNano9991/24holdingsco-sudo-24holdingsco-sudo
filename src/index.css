@@ -330,65 +330,6 @@ body {
   background-color: #F3F3F3;
 }
 
-/* Highlighting for visited/checked/selected elements */
-.selected, .checked, .visited, .active {
-  background-color: #FFD700 !important; /* Gold highlight */
-  color: #000000 !important;
-  border-color: #B8860B !important;
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3) !important;
-  transition: all 0.3s ease !important;
-}
-
-/* Specific overrides for buttons and cards */
-button.selected, button.active, .score-card.selected, .task-item.completed {
-  background-color: #FFD700 !important;
-  color: #000000 !important;
-  border-color: #B8860B !important;
-}
-
-/* Dark mode support for background and interactive elements */
-.dark body {
-  background-color: #0A0A0A;
-  color: #E5E5E5;
-}
-
-.dark .material-card, .dark .score-card, .dark .patient-classification, .dark .tasks-section, .dark .bg-white {
-  background-color: #1A1A1A !important;
-  border-color: #333333 !important;
-  color: #E5E5E5 !important;
-}
-
-.dark .text-slate-800, .dark .text-slate-900 {
-  color: #FFFFFF !important;
-}
-
-.dark .text-slate-600, .dark .text-slate-500 {
-  color: #A3A3A3 !important;
-}
-
-.dark .border-border, .dark .border-slate-200 {
-  border-color: #333333 !important;
-}
-
-.dark .bg-slate-50, .dark .bg-slate-100 {
-  background-color: #262626 !important;
-}
-
-/* Animations - Re-enabling some for the high-tech feel */
-.animate-spin {
-  animation: spin 1s linear infinite !important;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Transitions for interactive elements */
-.transition-all {
-  transition: all 0.3s ease !important;
-}
-
 /* Remove Molecule Graphic */
 .medical-background {
   display: none !important;

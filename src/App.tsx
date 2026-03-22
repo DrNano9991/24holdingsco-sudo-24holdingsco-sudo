@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { 
   Activity, Brain, Wind, Stethoscope, ShieldCheck, Moon, Sun, Calculator, AlertCircle, Eye, Zap,
-  Volume2, VolumeX, Info, X, Languages, Pill, LogOut
+  Volume2, VolumeX, Info, X, Languages, Pill
 } from 'lucide-react';
-import { auth } from './firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import AuthPage from './components/AuthPage';
-import Background from './components/Background';
 import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, SurgicalState, PatientData, SavedPatient, Task, MachineData } from './types';
 import { BOTTOM_NAV_SECTIONS } from './constants';
 import ScoreCard from './components/ScoreCard';
@@ -46,33 +42,10 @@ const getPlatform = (): 'ios' | 'android' => {
 
 const App: React.FC = () => {
   const { t, language, setLanguage } = useTranslation();
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [platform, setPlatform] = useState<'ios' | 'android'>('android');
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error("Logout error:", err);
-    }
-  };
-
   const [isSplashing, setIsSplashing] = useState(true);
   const [activeTab, setActiveTab] = useState('calculators');
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(['calculators']));
   const [activeRibbonTab, setActiveRibbonTab] = useState<'Home' | 'View' | 'Settings'>('Home');
-
-  useEffect(() => {
-    setVisitedTabs(prev => new Set(prev).add(activeTab));
-  }, [activeTab]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiInsight, setAiInsight] = useState<SynthesisResult | null>(null);
   const [synthesisOptions, setSynthesisOptions] = useState<SynthesisOptions>({
@@ -406,23 +379,6 @@ const App: React.FC = () => {
     };
   }, [isSplashing, isSpeechEnabled]);
 
-  if (authLoading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white dark:bg-slate-900">
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-primary animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <>
-        <Background />
-        <AuthPage />
-      </>
-    );
-  }
-
   if (isSplashing) {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white transition-none">
@@ -457,10 +413,10 @@ const App: React.FC = () => {
                   <button
                     key={group}
                     onClick={() => handleAgeGroupChange(group)}
-                    className={`px-4 py-2 text-xs font-bold border-r border-border last:border-r-0 transition-all ${
+                    className={`px-4 py-2 text-xs font-bold border-r border-border last:border-r-0 transition-none ${
                       ageGroup === group 
-                        ? 'active z-10' 
-                        : 'bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
+                        ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                        : 'bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     {t(group.toLowerCase() as any)}
@@ -708,10 +664,10 @@ const App: React.FC = () => {
                           <button
                             key={tab.id}
                             onClick={() => setConsultTab(tab.id as any)}
-                            className={`px-3 py-1.5 text-[10px] font-bold border-r border-border last:border-r-0 transition-all uppercase tracking-widest ${
+                            className={`px-3 py-1.5 text-[10px] font-bold border-r border-border last:border-r-0 transition-none uppercase tracking-widest ${
                               consultTab === tab.id 
-                                ? 'active z-10' 
-                                : 'bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
+                                ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                                : 'bg-white text-slate-600 hover:bg-slate-50'
                             }`}
                           >
                             {tab.label}
@@ -787,8 +743,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`${platform} relative min-h-screen`}>
-      <Background />
+    <div className={platform}>
       {isInactive && <Screensaver />}
       
       {/* Save Modal */}
@@ -1010,10 +965,6 @@ const App: React.FC = () => {
                     <div className="ribbon-button-icon mb-1"><Trash2 size={20} className="text-red-500" /></div>
                     <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Clear All</span>
                   </button>
-                  <button onClick={handleLogout} className="ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-red-50 hover:border-red-500 transition-none">
-                    <div className="ribbon-button-icon mb-1"><LogOut size={20} className="text-red-600" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Sign Out</span>
-                  </button>
                 </div>
                 <div className="text-[8px] text-slate-400 uppercase font-bold tracking-widest">System</div>
               </div>
@@ -1027,27 +978,16 @@ const App: React.FC = () => {
       </main>
 
       {/* Mobile Bottom Nav - Only visible on small screens */}
-      <nav className="bottom-nav lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-border z-40">
+      <nav className="bottom-nav lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-40">
         <div className="flex justify-around items-center h-14 max-w-7xl mx-auto">
           {[...BOTTOM_NAV_SECTIONS, { id: 'patients', name: t('records'), icon: <FolderOpen size={18} /> }].map((s) => (
             <button 
               key={s.id} 
               onClick={() => setActiveTab(s.id)} 
-              className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all relative ${
-                activeTab === s.id 
-                  ? 'active' 
-                  : visitedTabs.has(s.id)
-                    ? 'visited opacity-80'
-                    : 'text-slate-500 hover:bg-slate-50'
-              }`}
+              className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-none ${activeTab === s.id ? 'bg-primary-light text-primary border-t border-primary' : 'text-slate-500 hover:bg-slate-50'}`}
             >
-              <div className={`transition-transform ${activeTab === s.id ? 'scale-110' : 'scale-100'}`}>
-                {s.icon}
-              </div>
+              {s.icon}
               <span className="font-bold text-[9px] uppercase tracking-tighter">{s.name}</span>
-              {activeTab === s.id && (
-                <div className="absolute top-0 left-0 right-0 h-0.5 bg-black" />
-              )}
             </button>
           ))}
         </div>

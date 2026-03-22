@@ -22,11 +22,10 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ title, subtitle, icon, children, 
   };
 
   const activeColor = colorClasses[color] || colorClasses.red;
-  const isSelected = score !== undefined && score !== 0 && score !== '15' && score !== '0';
 
   return (
-    <div className={`score-card bg-white border border-border flex flex-col h-full transition-all ${isSelected ? 'selected' : ''}`}>
-      <div className="p-2 border-b border-border flex justify-between items-center bg-[#F3F3F3] dark:bg-slate-800">
+    <div className="score-card bg-white border border-border flex flex-col h-full transition-none">
+      <div className="p-2 border-b border-border flex justify-between items-center bg-[#F3F3F3]">
         <div className="flex items-center gap-2">
           {icon && <div className={`p-1 border border-border ${activeColor.split(' ')[0]} ${activeColor.split(' ')[1]}`}>{icon}</div>}
           <div>

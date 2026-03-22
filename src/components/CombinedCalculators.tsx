@@ -162,10 +162,10 @@ const CombinedCalculators: React.FC<Props> = ({
                   <button
                     key={opt.value}
                     onClick={() => handleGcsChange(type, opt.value)}
-                    className={`p-2 text-left border-r border-b border-border last:border-r-0 transition-all ${
+                    className={`p-2 text-left border-r border-b border-border last:border-r-0 transition-none ${
                       gcs[type] === opt.value 
-                        ? 'active z-10' 
-                        : 'bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
+                        ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                        : 'bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     <div className="font-bold text-xs">{t(opt.label.toLowerCase().replace(/\s+/g, '') as any)}</div>
@@ -255,10 +255,10 @@ const CombinedCalculators: React.FC<Props> = ({
                 <button
                   key={i}
                   onClick={() => setMews({...mews, avpu: i})}
-                  className={`p-2 border-r border-border last:border-r-0 text-[11px] font-bold transition-all ${
+                  className={`p-2 border-r border-border last:border-r-0 text-[11px] font-bold transition-none ${
                     mews.avpu === i 
-                      ? 'active z-10' 
-                      : 'bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
+                      ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   {label}
@@ -362,10 +362,10 @@ const CombinedCalculators: React.FC<Props> = ({
                     <button
                       key={val}
                       onClick={() => setPews({...pews, [type]: val})}
-                      className={`flex-1 p-2 border-r border-border last:border-r-0 text-xs font-bold transition-all ${
+                      className={`flex-1 p-2 border-r border-border last:border-r-0 text-xs font-bold transition-none ${
                         pews[type] === val 
-                          ? 'active z-10' 
-                          : 'bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
+                          ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                          : 'bg-white text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       {val}
@@ -473,7 +473,7 @@ const CombinedCalculators: React.FC<Props> = ({
                 <button 
                   key={d} 
                   onClick={() => setSurgery({...surgery, duration: d})}
-                  className={`p-2 border-r border-border last:border-r-0 text-[11px] font-bold transition-all ${surgery.duration === d ? 'active z-10' : 'bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'}`}
+                  className={`p-2 border-r border-border last:border-r-0 text-[11px] font-bold transition-none ${surgery.duration === d ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                 >
                   {d}
                 </button>
