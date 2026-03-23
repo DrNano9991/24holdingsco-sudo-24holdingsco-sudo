@@ -30,7 +30,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* General & Hydration */}
-        <ScoreCard title="Hydration & Perfusion" subtitle="General Assessment" icon={<Droplets size={20} />} color="blue">
+        <ScoreCard title="Hydration & Perfusion" subtitle="General Assessment" icon={<Droplets size={20} />}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -84,16 +84,16 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
         </ScoreCard>
 
         {/* Cardiovascular & Neuromuscular */}
-        <ScoreCard title="Vascular & Motor" subtitle="Peripheral & Strength" icon={<Activity size={20} />} color="slate">
+        <ScoreCard title="Vascular & Motor" subtitle="Peripheral & Strength" icon={<Activity size={20} />}>
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Pulse Grade (0-3)</label>
-              <div className="flex gap-0 border border-border">
+              <div className="flex gap-1 p-1 bg-slate-50 border border-border">
                 {[0, 1, 2, 3].map(v => (
                   <button 
                     key={v} 
                     onClick={() => setExam({...exam, pulseGrade: v})}
-                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-sm font-bold transition-none ${exam.pulseGrade === v ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-1.5 border border-border text-sm font-bold transition-none ${exam.pulseGrade === v ? 'bg-slate-400 text-white border-slate-500 z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {v}+
                   </button>
@@ -108,12 +108,12 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Muscle Strength (0-5)</label>
-              <div className="flex gap-0 border border-border">
+              <div className="flex gap-1 p-1 bg-slate-50 border border-border">
                 {[0, 1, 2, 3, 4, 5].map(v => (
                   <button 
                     key={v} 
                     onClick={() => setExam({...exam, muscleStrength: v})}
-                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-xs font-bold transition-none ${exam.muscleStrength === v ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-1.5 border border-border text-xs font-bold transition-none ${exam.muscleStrength === v ? 'bg-slate-400 text-white border-slate-500 z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {v}
                   </button>
@@ -132,11 +132,11 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
         </ScoreCard>
 
         {/* Liver Specific Findings */}
-        <ScoreCard title="Liver Findings" subtitle="Hepatic Assessment" icon={<Droplets size={20} />} color="orange">
+        <ScoreCard title="Liver Findings" subtitle="Hepatic Assessment" icon={<Droplets size={20} />}>
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Ascites</label>
-              <div className="flex gap-0 border border-border">
+              <div className="flex gap-1 p-1 bg-slate-50 border border-border">
                 {[
                   { value: 1, label: 'None' },
                   { value: 2, label: 'Mild' },
@@ -145,7 +145,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   <button 
                     key={opt.value} 
                     onClick={() => setLiver({...liver, ascites: opt.value})}
-                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-[10px] font-bold transition-none ${liver.ascites === opt.value ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-1.5 border border-border text-[10px] font-bold transition-none ${liver.ascites === opt.value ? 'bg-slate-400 text-white border-slate-500 z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {opt.label}
                   </button>
@@ -154,7 +154,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Encephalopathy</label>
-              <div className="flex gap-0 border border-border">
+              <div className="flex gap-1 p-1 bg-slate-50 border border-border">
                 {[
                   { value: 1, label: 'None' },
                   { value: 2, label: 'Grade 1-2' },
@@ -163,7 +163,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                   <button 
                     key={opt.value} 
                     onClick={() => setLiver({...liver, encephalopathy: opt.value})}
-                    className={`flex-1 p-2 border-r border-border last:border-r-0 text-[10px] font-bold transition-none ${liver.encephalopathy === opt.value ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex-1 p-1.5 border border-border text-[10px] font-bold transition-none ${liver.encephalopathy === opt.value ? 'bg-slate-400 text-white border-slate-500 z-10' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {opt.label}
                   </button>
@@ -185,7 +185,7 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
         </ScoreCard>
 
         {/* Anthropometry */}
-        <ScoreCard title="Anthropometry" subtitle="Body Measurements" icon={<Ruler size={20} />} color="emerald">
+        <ScoreCard title="Anthropometry" subtitle="Body Measurements" icon={<Ruler size={20} />}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

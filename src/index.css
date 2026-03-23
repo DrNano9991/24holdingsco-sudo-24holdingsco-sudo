@@ -315,19 +315,28 @@ h1, h2, h3, h4 {
   background: #A6A6A6;
 }
 
-/* Animations - Disabled for Aero-Lite */
-* {
-  animation: none !important;
-  transition: none !important;
+/* Animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* High Contrast Base */
-body {
-  background-color: #F3F3F3;
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
-.app-container {
-  background-color: #F3F3F3;
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+/* Transitions for interactive elements */
+.transition-all {
+  transition: all 0.3s ease !important;
 }
 
 /* Remove Molecule Graphic */

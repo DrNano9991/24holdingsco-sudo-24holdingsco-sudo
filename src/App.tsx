@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { 
   Activity, Brain, Wind, Stethoscope, ShieldCheck, Moon, Sun, Calculator, AlertCircle, Eye, Zap,
-  Volume2, VolumeX, Info, X, Languages, Pill
+  Volume2, VolumeX, Info, X, Languages, Pill, Lock, Key
 } from 'lucide-react';
 import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, SurgicalState, PatientData, SavedPatient, Task, MachineData } from './types';
 import { BOTTOM_NAV_SECTIONS } from './constants';
@@ -17,6 +17,7 @@ import { logger } from './services/logger';
 
 import ReactMarkdown from 'react-markdown';
 import Screensaver from './components/Screensaver';
+import PasswordLock from './components/PasswordLock';
 import { speechService } from './services/speechService';
 
 // Lazy loaded components
@@ -45,6 +46,7 @@ const App: React.FC = () => {
   const [platform, setPlatform] = useState<'ios' | 'android'>('android');
   const [isSplashing, setIsSplashing] = useState(true);
   const [activeTab, setActiveTab] = useState('calculators');
+  const [activeCalculator, setActiveCalculator] = useState<string>('MEWS');
   const [activeRibbonTab, setActiveRibbonTab] = useState<'Home' | 'View' | 'Settings'>('Home');
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiInsight, setAiInsight] = useState<SynthesisResult | null>(null);
@@ -84,6 +86,79 @@ const App: React.FC = () => {
   const [isSpeechEnabled, setIsSpeechEnabled] = useLocalStorage('ai-medica-speech-enabled', true);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isAuthorized, setIsAuthorized] = useState(() => {
+    return sessionStorage.getItem('ai-medica-authorized') === 'true';
+  });
+  const [isGuestMode, setIsGuestMode] = useState(() => {
+    return sessionStorage.getItem('ai-medica-guest-mode') === 'true';
+  });
+  const [guestLogs, setGuestLogs] = useLocalStorage<any[]>('ai-medica-guest-logs', []);
+  const [showSecurityAlert, setShowSecurityAlert] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const handlePasswordChange = () => {
+    if (newPassword.length < 4) {
+      setPasswordError('Password too short');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    localStorage.setItem('ai-medica-password', newPassword);
+    setShowPasswordChange(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    alert('Password updated successfully');
+  };
+
+  const handleLogout = () => {
+    setIsAuthorized(false);
+    setIsGuestMode(false);
+    sessionStorage.removeItem('ai-medica-authorized');
+    sessionStorage.removeItem('ai-medica-guest-mode');
+    speechService.notifyChange('Security', 'Session terminated. Application locked.');
+  };
+
+  const logGuestAction = (action: string) => {
+    if (isGuestMode) {
+      const newLog = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        action,
+      };
+      setGuestLogs(prev => [newLog, ...prev]);
+    }
+  };
+
+  useEffect(() => {
+    const handleGuestAction = (e: any) => {
+      logGuestAction(e.detail);
+    };
+    window.addEventListener('guest-action', handleGuestAction);
+    return () => window.removeEventListener('guest-action', handleGuestAction);
+  }, [isGuestMode]);
+
+  useEffect(() => {
+    if (isAuthorized && !isGuestMode && guestLogs.length > 0) {
+      setShowSecurityAlert(true);
+    }
+  }, [isAuthorized, isGuestMode, guestLogs]);
+
+  const readLogs = () => {
+    if (guestLogs.length === 0) {
+      speechService.speak("No security logs found.");
+      return;
+    }
+    const logText = guestLogs.map(log => 
+      `At ${new Date(log.timestamp).toLocaleTimeString()}, guest performed: ${log.action}`
+    ).join('. ');
+    speechService.speak(`Security Alert. Guest activity detected. ${logText}`);
+  };
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -97,27 +172,53 @@ const App: React.FC = () => {
   }, []);
 
   // --- COMPREHENSIVE STATE (PERSISTED) ---
-  const [gcs, setGcs] = useLocalStorage<GCSState>('ai-medica-gcs', { eye: 4, verbal: 5, motor: 6 });
-  const [sirs, setSirs] = useLocalStorage<SIRSState>('ai-medica-sirs', { temp: 37, heartRate: 80, respRate: 16, wbc: 8, bands: '' });
-  const [qsofa, setQsofa] = useLocalStorage<QSOFAState>('ai-medica-qsofa', { lowBP: false, highRR: false, alteredMentation: false });
-  const [mews, setMews] = useLocalStorage<MEWSState>('ai-medica-mews', { sbp: 120, hr: 80, rr: 16, temp: 37, avpu: 0 });
-  const [liver, setLiver] = useLocalStorage<LiverState>('ai-medica-liver', { bilirubin: '', albumin: '', inr: '', creatinine: '', sodium: '', ascites: 1, encephalopathy: 1, dialysis: false });
-  const [exam, setExam] = useLocalStorage<ExamState>('ai-medica-exam', { jvp: '', capRefill: '', skinTurgor: 'Normal', mucosa: 'Moist', pulseGrade: 2, muscleStrength: 5 });
-  const [surgery, setSurgery] = useLocalStorage<SurgicalState>('ai-medica-surgery', { asa: 1, age: '', preOpSpO2: '', respInfection: false, preOpAnemia: false, surgeryType: 'Peripheral', duration: '<2h' });
-  const [curb65, setCurb65] = useLocalStorage('ai-medica-curb65', { confusion: false, urea: false, rr: false, bp: false, age: false });
-  const [wellsPE, setWellsPE] = useLocalStorage('ai-medica-wells-pe', { dvtSymptoms: false, peLikely: false, hr100: false, immobilization: false, priorDvtPe: false, hemoptysis: false, malignancy: false });
-  const [chads, setChads] = useLocalStorage('ai-medica-chads', { chf: false, htn: false, age75: false, dm: false, stroke: false, vascular: false, age65: false, female: false });
-  const [pews, setPews] = useLocalStorage<PEWSState>('ai-medica-pews', { behavior: 0, cardiovascular: 0, respiratory: 0, nebulizer: false, persistentVomiting: false });
-  const [machineData, setMachineData] = useLocalStorage<MachineData[]>('ai-medica-machine-data', []);
-  const [ageGroup, setAgeGroup] = useLocalStorage<AgeGroup>('ai-medica-age-group', 'Adult');
-  const [anthro, setAnthro] = useLocalStorage<{ waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; }>('ai-medica-anthro', { waist: '', height: '', hip: '', weight: '' });
-  const [notes, setNotes] = useLocalStorage('ai-medica-notes', '');
+  const [gcs, setGcsRaw] = useLocalStorage<GCSState>('ai-medica-gcs', { eye: 4, verbal: 5, motor: 6 });
+  const [sirs, setSirsRaw] = useLocalStorage<SIRSState>('ai-medica-sirs', { temp: 37, heartRate: 80, respRate: 16, wbc: 8, bands: '' });
+  const [qsofa, setQsofaRaw] = useLocalStorage<QSOFAState>('ai-medica-qsofa', { lowBP: false, highRR: false, alteredMentation: false });
+  const [mews, setMewsRaw] = useLocalStorage<MEWSState>('ai-medica-mews', { sbp: 120, hr: 80, rr: 16, temp: 37, avpu: 0 });
+  const [liver, setLiverRaw] = useLocalStorage<LiverState>('ai-medica-liver', { bilirubin: '', albumin: '', inr: '', creatinine: '', sodium: '', ascites: 1, encephalopathy: 1, dialysis: false });
+  const [exam, setExamRaw] = useLocalStorage<ExamState>('ai-medica-exam', { jvp: '', capRefill: '', skinTurgor: 'Normal', mucosa: 'Moist', pulseGrade: 2, muscleStrength: 5 });
+  const [surgery, setSurgeryRaw] = useLocalStorage<SurgicalState>('ai-medica-surgery', { asa: 1, age: '', preOpSpO2: '', respInfection: false, preOpAnemia: false, surgeryType: 'Peripheral', duration: '<2h' });
+  const [curb65, setCurb65Raw] = useLocalStorage('ai-medica-curb65', { confusion: false, urea: false, rr: false, bp: false, age: false });
+  const [wellsPE, setWellsPERaw] = useLocalStorage('ai-medica-wells-pe', { dvtSymptoms: false, peLikely: false, hr100: false, immobilization: false, priorDvtPe: false, hemoptysis: false, malignancy: false });
+  const [chads, setChadsRaw] = useLocalStorage('ai-medica-chads', { chf: false, htn: false, age75: false, dm: false, stroke: false, vascular: false, age65: false, female: false });
+  const [pews, setPewsRaw] = useLocalStorage<PEWSState>('ai-medica-pews', { behavior: 0, cardiovascular: 0, respiratory: 0, nebulizer: false, persistentVomiting: false });
+  const [machineData, setMachineDataRaw] = useLocalStorage<MachineData[]>('ai-medica-machine-data', []);
+  const [ageGroup, setAgeGroupRaw] = useLocalStorage<AgeGroup>('ai-medica-age-group', 'Adult');
+  const [anthro, setAnthroRaw] = useLocalStorage<{ waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; }>('ai-medica-anthro', { waist: '', height: '', hip: '', weight: '' });
+  const [notes, setNotesRaw] = useLocalStorage('ai-medica-notes', '');
+
+  // Wrapped Setters for Logging
+  const setGcs = (val: any) => { setGcsRaw(val); logGuestAction('Updated GCS score'); };
+  const setSirs = (val: any) => { setSirsRaw(val); logGuestAction('Updated SIRS parameters'); };
+  const setQsofa = (val: any) => { setQsofaRaw(val); logGuestAction('Updated qSOFA parameters'); };
+  const setMews = (val: any) => { setMewsRaw(val); logGuestAction('Updated MEWS parameters'); };
+  const setLiver = (val: any) => { setLiverRaw(val); logGuestAction('Updated Liver function data'); };
+  const setExam = (val: any) => { setExamRaw(val); logGuestAction('Updated Physical Exam data'); };
+  const setSurgery = (val: any) => { setSurgeryRaw(val); logGuestAction('Updated Surgical risk data'); };
+  const setCurb65 = (val: any) => { setCurb65Raw(val); logGuestAction('Updated CURB-65 parameters'); };
+  const setWellsPE = (val: any) => { setWellsPERaw(val); logGuestAction('Updated Wells PE parameters'); };
+  const setChads = (val: any) => { setChadsRaw(val); logGuestAction('Updated CHADS-VASc parameters'); };
+  const setPews = (val: any) => { setPewsRaw(val); logGuestAction('Updated PEWS parameters'); };
+  const setMachineData = (val: any) => { setMachineDataRaw(val); }; // Logged in onAddData
+  const setAgeGroup = (val: any) => { setAgeGroupRaw(val); logGuestAction(`Changed age group to ${val}`); };
+  const setAnthro = (val: any) => { setAnthroRaw(val); logGuestAction('Updated Anthropometrics'); };
+  const setNotes = (val: any) => { setNotesRaw(val); logGuestAction('Modified clinical notes'); };
 
   // --- SAVED PATIENTS ---
   const [savedPatients, setSavedPatients] = useLocalStorage<SavedPatient[]>('ai-medica-saved-patients', []);
   const [tasks, setTasks] = useLocalStorage<Task[]>('ai-medica-tasks', []);
   const [patientName, setPatientName] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+  const handleCopyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopyStatus('copied');
+      setTimeout(() => setCopyStatus(null), 2000);
+    });
+  };
 
   // --- PLATFORM & UI EFFECTS ---
   useEffect(() => {
@@ -218,17 +319,19 @@ const App: React.FC = () => {
       const result = await clinicalAI.synthesize(primaryType, primaryValue, components, patientContext, synthesisOptions);
       setAiInsight(result);
       
+      logGuestAction(`Performed clinical synthesis for ${primaryType} score of ${primaryValue}`);
+      
       if (isSpeechEnabled) {
         let fullReport = `Clinical Synthesis for ${primaryType} score of ${primaryValue}. `;
         if (result.summary) fullReport += `Summary: ${result.summary}. `;
         if (result.actions && result.actions.length > 0) {
-          fullReport += `Recommended Actions: ${result.actions.join('. ')}. `;
+          fullReport += `Recommended Actions: ${result.actions}. `;
         }
         if (result.diagnostics && result.diagnostics.length > 0) {
-          fullReport += `Diagnostic Workup: ${result.diagnostics.join('. ')}. `;
+          fullReport += `Diagnostic Workup: ${result.diagnostics}. `;
         }
         if (result.education && result.education.length > 0) {
-          fullReport += `Patient Education: ${result.education.join('. ')}. `;
+          fullReport += `Patient Education: ${result.education}. `;
         }
         speechService.speak(fullReport, result.riskLevel === 'Critical' ? 'critical' : result.riskLevel === 'High' ? 'high' : 'normal');
       }
@@ -265,8 +368,12 @@ const App: React.FC = () => {
     // Create tasks from AI insights
     const newTasks: Task[] = [];
     if (aiInsight) {
-      if (aiInsight.actions) {
-        aiInsight.actions.forEach((action: string) => {
+      if (aiInsight.actions && typeof aiInsight.actions === 'string') {
+        const actionLines = aiInsight.actions.split('\n')
+          .filter(line => line.startsWith('    ') && line.trim().length > 0)
+          .map(line => line.trim());
+          
+        actionLines.forEach((action: string) => {
           newTasks.push({
             id: `task-${Date.now()}-${Math.random()}`,
             text: `Action: ${action}`,
@@ -278,8 +385,12 @@ const App: React.FC = () => {
           });
         });
       }
-      if (aiInsight.diagnostics) {
-        aiInsight.diagnostics.forEach((diag: string) => {
+      if (aiInsight.diagnostics && typeof aiInsight.diagnostics === 'string') {
+        const diagLines = aiInsight.diagnostics.split('\n')
+          .filter(line => line.startsWith('    ') && line.trim().length > 0)
+          .map(line => line.trim());
+
+        diagLines.forEach((diag: string) => {
           newTasks.push({
             id: `task-${Date.now()}-${Math.random()}`,
             text: `Investigation: ${diag}`,
@@ -297,6 +408,9 @@ const App: React.FC = () => {
     setTasks([...newTasks, ...tasks]);
     setPatientName('');
     setShowSaveModal(false);
+    setShowSaveConfirm(false);
+    
+    logGuestAction(`Registered new patient: ${newPatient.name} (${newPatient.serialNumber})`);
     
     const speechMsg = `Patient ${newPatient.name} has been successfully registered with serial number ${serialNumber.split('').join(' ')}. ${newTasks.length} clinical tasks have been added to your list based on AI recommendations.`;
     speechService.notifyChange('Patient Registration', speechMsg);
@@ -320,6 +434,7 @@ const App: React.FC = () => {
     const patient = savedPatients.find(p => p.id === id);
     if (patient) {
       speechService.notifyChange('Database Update', `Patient record for ${patient.name} has been removed.`);
+      logGuestAction(`Deleted patient record: ${patient.name} (${patient.serialNumber})`);
     }
     setSavedPatients(savedPatients.filter(p => p.id !== id));
   };
@@ -400,7 +515,7 @@ const App: React.FC = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between bg-white p-4 border border-border">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary">
+                <div className="p-2 bg-slate-800">
                   <Activity className="text-white" size={20} />
                 </div>
                 <div>
@@ -408,14 +523,14 @@ const App: React.FC = () => {
                   <p className="text-lg font-bold text-slate-900">{t(ageGroup.toLowerCase() as any)}</p>
                 </div>
               </div>
-              <div className="flex gap-0 border border-border">
+              <div className="flex gap-1 border border-border p-1 bg-slate-50">
                 {(['Adult', 'Pediatric', 'Neonate'] as const).map((group) => (
                   <button
                     key={group}
                     onClick={() => handleAgeGroupChange(group)}
-                    className={`px-4 py-2 text-xs font-bold border-r border-border last:border-r-0 transition-none ${
+                    className={`px-4 py-1.5 text-xs font-bold border border-border transition-none ${
                       ageGroup === group 
-                        ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                        ? 'bg-slate-400 text-white border-slate-500 z-10' 
                         : 'bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -425,7 +540,11 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <ScoreSummaryPanel gcs={gcs} mews={mews} sirs={sirs} qsofa={qsofa} curb65={curb65} pews={pews} surgery={surgery} anthro={anthro} />
+            <ScoreSummaryPanel 
+              gcs={gcs} mews={mews} sirs={sirs} qsofa={qsofa} curb65={curb65} pews={pews} surgery={surgery} anthro={anthro} 
+              activeCalculator={activeCalculator}
+              onSelect={setActiveCalculator}
+            />
             
             <CombinedCalculators 
               ageGroup={ageGroup}
@@ -435,10 +554,11 @@ const App: React.FC = () => {
               qsofa={qsofa} setQsofa={setQsofa}
               pews={pews} setPews={setPews}
               surgery={surgery} setSurgery={setSurgery}
+              activeCalculator={activeCalculator}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <ScoreCard title="CHA₂DS₂-VASc" subtitle="Stroke Risk in AF" icon={<ShieldCheck size={20} />} score={ScoringEngine.calculateCHADS2VASc(chads)} color="emerald">
+              <ScoreCard title="CHA₂DS₂-VASc" subtitle="Stroke Risk in AF" icon={<ShieldCheck size={20} />} score={ScoringEngine.calculateCHADS2VASc(chads)}>
                 <div className="grid grid-cols-1 gap-2">
                   {[
                     { key: 'chf', label: 'CHF / LV Dysfunction (1)' },
@@ -482,7 +602,7 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </ScoreCard>
-              <ScoreCard title="Wells PE" subtitle="Pulmonary Embolism" icon={<Wind size={20}/>} score={ScoringEngine.calculateWellsPE(wellsPE)} color="blue">
+              <ScoreCard title="Wells PE" subtitle="Pulmonary Embolism" icon={<Wind size={20}/>} score={ScoringEngine.calculateWellsPE(wellsPE)}>
                   <div className="space-y-2">
                       {Object.entries({ 
                           dvtSymptoms: 'Clinical DVT Signs (3)', 
@@ -536,7 +656,7 @@ const App: React.FC = () => {
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 uppercase tracking-tight">
                 <FolderOpen className="text-primary" /> {t('savedPatients')}
               </h2>
-              <button onClick={() => setActiveTab('calculators')} className="p-2 bg-white border border-border text-slate-600 hover:bg-slate-50 transition-none">
+              <button onClick={() => setActiveTab('calculators')} className="p-1.5 bg-white border border-border text-slate-600 hover:bg-slate-50 transition-none">
                 <UserPlus size={18} />
               </button>
             </div>
@@ -549,7 +669,7 @@ const App: React.FC = () => {
                       <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-1">{p.serialNumber}</p>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{new Date(p.date).toLocaleString()}</p>
                     </div>
-                    <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[8px] font-bold border border-primary-light uppercase">{t(p.ageGroup.toLowerCase() as any)}</span>
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[8px] font-bold border border-border uppercase">{t(p.ageGroup.toLowerCase() as any)}</span>
                   </div>
                   <div className="flex gap-2">
                     <button 
@@ -579,11 +699,17 @@ const App: React.FC = () => {
       case 'tasks': return <TaskList />;
       case 'diagnostics':
         return (
-          <MachineDataImport 
-            machineData={machineData}
-            onAddData={(data) => setMachineData([data, ...machineData])}
-            onRemoveData={(id) => setMachineData(machineData.filter(d => d.id !== id))}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <MachineDataImport 
+              machineData={machineData}
+              onAddData={(data) => {
+                setMachineData([data, ...machineData]);
+                logGuestAction(`Added machine data: ${data.type} - ${data.interpretation || 'No interpretation'}`);
+              }}
+              onRemoveData={(id) => setMachineData(machineData.filter(d => d.id !== id))}
+              onClearAll={() => setMachineData([])}
+            />
+          </Suspense>
         );
       case 'summary':
         return (
@@ -617,29 +743,44 @@ const App: React.FC = () => {
                             )}
                          </h2>
                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-0 border border-border bg-slate-50">
+                            <div className="flex items-center gap-1 border border-border bg-slate-50 p-1">
                                {(['diagnostic', 'therapeutic', 'educational'] as const).map(f => (
                                  <button
                                    key={f}
                                    onClick={() => setSynthesisOptions({ ...synthesisOptions, focus: f })}
-                                   className={`px-2 py-1 text-[8px] font-bold uppercase tracking-tight border-r border-border last:border-r-0 transition-none ${synthesisOptions.focus === f ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'text-slate-400 hover:text-slate-600'}`}
+                                   className={`px-3 py-1.5 text-[8px] font-bold uppercase tracking-tight border border-border transition-none ${synthesisOptions.focus === f ? 'bg-slate-400 text-white border-slate-500 z-10' : 'text-slate-400 hover:text-slate-600'}`}
                                  >
                                    {f}
                                  </button>
                                 ))}
                             </div>
-                            <div className="flex items-center gap-0 border border-border bg-slate-50">
+                            <div className="flex items-center gap-1 border border-border bg-slate-50 p-1">
                                {(['concise', 'standard', 'detailed'] as const).map(d => (
                                  <button
                                    key={d}
                                    onClick={() => setSynthesisOptions({ ...synthesisOptions, depth: d })}
-                                   className={`px-2 py-1 text-[8px] font-bold uppercase tracking-tight border-r border-border last:border-r-0 transition-none ${synthesisOptions.depth === d ? 'bg-primary-light text-primary outline-1 outline-primary z-10' : 'text-slate-400 hover:text-slate-600'}`}
+                                   className={`px-3 py-1.5 text-[8px] font-bold uppercase tracking-tight border border-border transition-none ${synthesisOptions.depth === d ? 'bg-slate-400 text-white border-slate-500 z-10' : 'text-slate-400 hover:text-slate-600'}`}
                                  >
                                    {d}
                                  </button>
                                 ))}
                             </div>
                             <div className="flex items-center gap-3">
+                               <button 
+                                 onClick={() => {
+                                   if (!aiInsight) return;
+                                   const text = `
+Clinical Synthesis: ${aiInsight.riskLevel} Risk
+Summary: ${aiInsight.summary}
+Actions: ${aiInsight.actions}
+Diagnostics: ${aiInsight.diagnostics}
+                                   `.trim();
+                                   handleCopyToClipboard(text);
+                                 }}
+                                 className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest border-2 transition-all flex items-center gap-2 ${copyStatus === 'copied' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-800 border-slate-800 hover:bg-slate-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}
+                               >
+                                 <Save size={12} /> {copyStatus === 'copied' ? t('copied') : t('copyToClipboard')}
+                               </button>
                                <button onClick={handleConsult} className="text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-primary transition-none flex items-center gap-1.5">
                                  <Activity size={10} /> {t('regenerate')}
                                </button>
@@ -653,7 +794,7 @@ const App: React.FC = () => {
                          </div>
                       </div>
                       
-                      <div className="flex gap-0 border border-border mb-4 overflow-x-auto scrollbar-hide">
+                      <div className="flex gap-1 border border-border p-1 bg-slate-50 mb-4 overflow-x-auto scrollbar-hide">
                         {[
                           { id: 'summary', label: t('summary') },
                           { id: 'actions', label: t('actions') },
@@ -664,9 +805,9 @@ const App: React.FC = () => {
                           <button
                             key={tab.id}
                             onClick={() => setConsultTab(tab.id as any)}
-                            className={`px-3 py-1.5 text-[10px] font-bold border-r border-border last:border-r-0 transition-none uppercase tracking-widest ${
+                            className={`px-3 py-1.5 text-[10px] font-bold border border-border transition-none uppercase tracking-widest ${
                               consultTab === tab.id 
-                                ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                                ? 'bg-slate-400 text-white border-slate-500 z-10' 
                                 : 'bg-white text-slate-600 hover:bg-slate-50'
                             }`}
                           >
@@ -682,37 +823,22 @@ const App: React.FC = () => {
                             </div>
                           )}
                          {consultTab === 'actions' && (
-                           <ul className="space-y-2">
-                             {aiInsight.actions.map((action, i) => (
-                               <li key={i} className="flex items-start gap-3 p-3 bg-white border border-border group">
-                                 <div className="w-1.5 h-1.5 bg-red-600 mt-1.5 flex-shrink-0" />
-                                 <span className="font-bold tracking-tight text-slate-800">{action}</span>
-                               </li>
-                             ))}
-                             {aiInsight.actions.length === 0 && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noActions')}</p>}
-                           </ul>
+                           <div className="p-4 bg-white border border-border">
+                             <div className="whitespace-pre-wrap font-medium text-slate-800">{aiInsight.actions}</div>
+                             {!aiInsight.actions && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noActions')}</p>}
+                           </div>
                          )}
                          {consultTab === 'diagnostics' && (
-                           <ul className="space-y-2">
-                             {aiInsight.diagnostics.map((diag, i) => (
-                               <li key={i} className="flex items-start gap-3 p-3 bg-white border border-border group">
-                                 <div className="w-1.5 h-1.5 bg-blue-600 mt-1.5 flex-shrink-0" />
-                                 <span className="font-bold tracking-tight text-slate-800">{diag}</span>
-                               </li>
-                             ))}
-                             {aiInsight.diagnostics.length === 0 && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noDiagnostics')}</p>}
-                           </ul>
+                           <div className="p-4 bg-white border border-border">
+                             <div className="whitespace-pre-wrap font-medium text-slate-800">{aiInsight.diagnostics}</div>
+                             {!aiInsight.diagnostics && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noDiagnostics')}</p>}
+                           </div>
                          )}
                          {consultTab === 'education' && (
-                           <ul className="space-y-2">
-                             {aiInsight.education.map((edu, i) => (
-                               <li key={i} className="flex items-start gap-3 p-3 bg-white border border-border group">
-                                 <div className="w-1.5 h-1.5 bg-emerald-600 mt-1.5 flex-shrink-0" />
-                                 <span className="font-bold tracking-tight text-slate-800">{edu}</span>
-                               </li>
-                             ))}
-                             {aiInsight.education.length === 0 && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noEducation')}</p>}
-                           </ul>
+                           <div className="p-4 bg-white border border-border">
+                             <div className="whitespace-pre-wrap font-medium text-slate-800">{aiInsight.education}</div>
+                             {!aiInsight.education && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noEducation')}</p>}
+                           </div>
                          )}
                          {consultTab === 'documentation' && (
                            <div className="p-4 bg-slate-800 text-slate-100 font-mono text-[10px] border border-slate-700 leading-relaxed">
@@ -744,23 +870,171 @@ const App: React.FC = () => {
 
   return (
     <div className={platform}>
-      {isInactive && <Screensaver />}
+      {isInactive && <Screensaver onWake={() => setIsInactive(false)} />}
       
+      {!isAuthorized && !isGuestMode && (
+        <PasswordLock 
+          onUnlock={() => {
+            setIsAuthorized(true);
+            setIsGuestMode(false);
+            sessionStorage.setItem('ai-medica-authorized', 'true');
+            sessionStorage.removeItem('ai-medica-guest-mode');
+          }} 
+          onBypass={() => {
+            setIsAuthorized(true);
+            setIsGuestMode(true);
+            sessionStorage.setItem('ai-medica-authorized', 'true');
+            sessionStorage.setItem('ai-medica-guest-mode', 'true');
+            // Force reload to apply guest mode storage prefix
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* Security Alert */}
+      {showSecurityAlert && (
+        <div className="fixed top-4 right-4 z-[150] w-full max-w-sm bg-white border-4 border-red-600 p-4 shadow-[8px_8px_0px_0px_rgba(220,38,38,0.2)] animate-slide-in">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-red-600">
+              <AlertTriangle className="text-white" size={20} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-black text-red-600 uppercase tracking-tight">Security Alert</h3>
+              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-1">Unauthorized Guest activity detected on this device.</p>
+              <div className="flex gap-2 mt-3">
+                <button 
+                  onClick={() => {
+                    readLogs();
+                    setShowSecurityAlert(false);
+                  }}
+                  className="px-3 py-1.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-red-700 transition-all"
+                >
+                  Read Logs (AI)
+                </button>
+                <button 
+                  onClick={() => {
+                    setGuestLogs([]);
+                    setShowSecurityAlert(false);
+                  }}
+                  className="px-3 py-1.5 bg-white text-red-600 border-2 border-red-600 text-[9px] font-black uppercase tracking-widest hover:bg-red-50 transition-all"
+                >
+                  Clear Logs
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setShowSecurityAlert(false)} className="text-slate-400 hover:text-slate-600">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPasswordChange && (
+        <div className="fixed inset-0 z-[150] bg-slate-900/40 flex items-center justify-center p-4 transition-none">
+          <div className="bg-white border-4 border-slate-800 p-6 w-full max-w-sm shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-slate-800">
+                <Key className="text-white" size={20} />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Update Password</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">New Password</label>
+                <input 
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full p-3 bg-slate-50 border-2 border-slate-200 font-bold text-sm outline-none focus:border-slate-800 transition-none"
+                  placeholder="MIN 4 CHARACTERS"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Confirm Password</label>
+                <input 
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full p-3 bg-slate-50 border-2 border-slate-200 font-bold text-sm outline-none focus:border-slate-800 transition-none"
+                  placeholder="REPEAT PASSWORD"
+                />
+              </div>
+              {passwordError && <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest">{passwordError}</p>}
+              
+              <div className="flex gap-2 pt-2">
+                <button 
+                  onClick={() => setShowPasswordChange(false)}
+                  className="flex-1 py-3 bg-white text-slate-800 font-bold border-2 border-slate-200 uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-none"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handlePasswordChange}
+                  className="flex-1 py-3 bg-slate-800 text-white font-bold border-2 border-slate-800 uppercase tracking-widest text-[10px] hover:bg-slate-700 transition-none"
+                >
+                  Update
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Save Modal */}
       {showSaveModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 transition-none">
-          <div className="bg-white border border-border p-6 w-full max-w-sm shadow-none transition-none">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 uppercase tracking-tight">{t('savePatientRecord')}</h3>
+          <div className="bg-white border-4 border-slate-800 p-6 w-full max-w-sm shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none">
+            <h3 className="text-lg font-black text-slate-800 mb-4 uppercase tracking-tight">{t('savePatientRecord')}</h3>
             <input 
               type="text" 
               placeholder={t('enterPatientName')} 
               value={patientName}
               onChange={e => setPatientName(e.target.value)}
-              className="w-full p-3 bg-white border border-border font-bold text-slate-800 outline-none focus:bg-slate-50 transition-none mb-4 text-sm"
+              className="w-full p-3 bg-slate-50 border-2 border-slate-200 font-bold text-slate-800 outline-none focus:border-slate-800 transition-none mb-4 text-sm"
             />
             <div className="flex gap-2">
-              <button onClick={() => setShowSaveModal(false)} className="flex-1 py-2 bg-slate-100 text-slate-600 font-bold border border-border uppercase tracking-widest text-[10px]">{t('cancel')}</button>
-              <button onClick={savePatient} className="flex-1 py-2 bg-primary text-white font-bold border border-primary uppercase tracking-widest text-[10px]">{t('save')}</button>
+              <button onClick={() => setShowSaveModal(false)} className="flex-1 py-3 bg-white text-slate-600 font-bold border-2 border-slate-200 uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-none">{t('cancel')}</button>
+              <button 
+                onClick={() => {
+                  if (!patientName) return;
+                  setShowSaveConfirm(true);
+                }} 
+                className="flex-1 py-3 bg-slate-800 text-white font-bold border-2 border-slate-800 uppercase tracking-widest text-[10px] hover:bg-slate-700 transition-none"
+              >
+                {t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Confirmation Dialog */}
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-[160] bg-slate-900/60 flex items-center justify-center p-4 transition-none">
+          <div className="bg-white border-4 border-red-600 p-6 w-full max-w-sm shadow-[8px_8px_0px_0px_rgba(220,38,38,0.2)] animate-scale-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-600">
+                <AlertTriangle className="text-white" size={20} />
+              </div>
+              <h3 className="text-lg font-black text-red-600 uppercase tracking-tight">{t('saveConfirmation')}</h3>
+            </div>
+            <p className="text-xs font-bold text-slate-600 uppercase leading-relaxed mb-6">
+              {t('confirmSave')}
+            </p>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setShowSaveConfirm(false)} 
+                className="flex-1 py-3 bg-white text-slate-400 font-bold border-2 border-slate-200 uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-none"
+              >
+                {t('cancel')}
+              </button>
+              <button 
+                onClick={savePatient} 
+                className="flex-1 py-3 bg-red-600 text-white font-bold border-2 border-red-600 uppercase tracking-widest text-[10px] hover:bg-red-700 transition-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]"
+              >
+                {t('confirm')}
+              </button>
             </div>
           </div>
         </div>
@@ -778,7 +1052,7 @@ const App: React.FC = () => {
             </button>
             
             <div className="flex items-center gap-4 mb-6">
-              <div className="p-2 bg-primary">
+              <div className="p-2 bg-slate-800">
                 <Activity className="text-white" size={20} />
               </div>
               <div>
@@ -827,171 +1101,165 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <header className="app-header sticky top-0 z-40 bg-white border-b border-border">
-        <div className="header-top px-4 py-2 flex items-center justify-between border-b border-slate-100">
+        {/* Desktop Title Bar */}
+        <div className="bg-slate-800 px-3 py-1.5 flex items-center justify-between select-none">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 flex items-center justify-center bg-primary">
-              <Activity className="text-white" size={14} />
-            </div>
-            <h1 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
-              {t('appName')}
-            </h1>
+            <Activity className="text-emerald-400" size={14} />
+            <span className="text-[10px] font-black text-white uppercase tracking-widest">
+              {t('appName')} - <span className="text-slate-400 font-medium">Clinical Workstation v2.5</span>
+            </span>
           </div>
-
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-2 py-0.5 border border-border bg-slate-50">
-              <div className={`w-1.5 h-1.5 ${isOnline ? 'bg-success' : 'bg-warning'}`} />
-              <span className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
-                {isOnline ? t('cloudAiActive') : t('localAiActive')}
-              </span>
+            <div className="flex items-center gap-4 mr-4">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <span className="text-[8px] font-black uppercase tracking-widest text-slate-300">
+                  {isOnline ? t('cloudAiActive') : t('localAiActive')}
+                </span>
+              </div>
+              {isGuestMode && (
+                <span className="text-[8px] font-black uppercase tracking-widest text-red-400 animate-pulse">
+                  Guest Mode
+                </span>
+              )}
             </div>
-            <button 
-              onClick={() => setLanguage(language === 'en' ? 'sw' : 'en')}
-              className="flex items-center gap-1 px-2 py-0.5 border border-border bg-white hover:bg-slate-50 transition-none"
-            >
-              <Languages size={12} className="text-slate-400" />
-              <span className="text-[8px] font-bold uppercase text-slate-600">{language}</span>
-            </button>
-            <button onClick={toggleNightMode} className="p-1 border border-border bg-white hover:bg-slate-50 transition-none">
-              {isNightMode ? <Sun size={14} className="text-slate-400" /> : <Moon size={14} className="text-slate-400" />}
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-amber-600 cursor-pointer hover:brightness-110" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-emerald-600 cursor-pointer hover:brightness-110" />
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500 border border-red-600 cursor-pointer hover:brightness-110" />
+            </div>
           </div>
         </div>
 
-        <div className="ribbon-tabs px-4 flex gap-0.5 mt-0.5">
+        {/* Desktop Menu Bar */}
+        <div className="bg-slate-100 border-b border-slate-200 px-2 py-0.5 flex items-center gap-1">
           {(['Home', 'View', 'Settings'] as const).map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveRibbonTab(tab)}
-              className={`ribbon-tab px-4 py-1 text-[10px] font-bold uppercase tracking-widest border-t border-x border-border -mb-[1px] z-10 transition-none ${activeRibbonTab === tab ? 'bg-white border-b-white' : 'bg-slate-100 text-slate-400 hover:text-slate-600'}`}
+              className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition-all rounded-sm ${activeRibbonTab === tab ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
             >
               {tab}
             </button>
           ))}
+          <div className="ml-auto flex items-center gap-2 pr-2">
+            <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date().toLocaleDateString()}</span>
+          </div>
         </div>
 
-        <div className="ribbon-content px-4 py-2 flex gap-6 bg-white border-t border-border min-h-[84px]">
+        {/* Desktop Toolbar (Unified Header) */}
+        <header className="app-toolbar bg-white border-b border-slate-200 p-1.5 flex items-center gap-4 overflow-x-auto no-scrollbar">
           {activeRibbonTab === 'Home' && (
             <>
-              <div className="ribbon-group flex flex-col items-center gap-1 pr-6 border-r border-slate-100">
-                <div className="flex gap-0.5">
-                  {[
-                    ...BOTTOM_NAV_SECTIONS, 
-                    { id: 'prescription', name: 'Prescription', icon: <Pill size={20} className="text-emerald-500" /> },
-                    { id: 'patients', name: t('records'), icon: <FolderOpen size={20} className="text-blue-400" /> }
-                  ].map((s) => (
-                    <button 
-                      key={s.id} 
-                      onClick={() => setActiveTab(s.id)} 
-                      className={`ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none ${activeTab === s.id ? 'bg-primary-light border-primary' : ''}`}
-                    >
-                      <div className="ribbon-button-icon mb-1">{s.icon}</div>
-                      <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">{s.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="text-[8px] text-slate-400 uppercase font-bold tracking-widest">Navigation</div>
+              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
+                {[
+                  ...BOTTOM_NAV_SECTIONS, 
+                  { id: 'prescription', name: 'Prescription', icon: <Pill size={14} className="text-emerald-500" /> },
+                  { id: 'patients', name: t('records'), icon: <FolderOpen size={14} className="text-blue-400" /> }
+                ].map((s) => (
+                  <button 
+                    key={s.id} 
+                    onClick={() => setActiveTab(s.id)} 
+                    className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${activeTab === s.id ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-700'}`}
+                  >
+                    {s.icon}
+                    <span className="text-[7px] font-bold uppercase mt-0.5">{s.name}</span>
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setActiveTab('prescription')} 
+                  className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${activeTab === 'prescription' ? 'bg-emerald-600 text-white shadow-inner' : 'text-slate-700'}`}
+                >
+                  <Calculator size={14} className={activeTab === 'prescription' ? 'text-white' : 'text-emerald-500'} />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Synthesis</span>
+                </button>
               </div>
 
-              <div className="ribbon-group flex flex-col items-center gap-1 pr-6 border-r border-slate-100">
-                <div className="flex gap-0.5">
-                  <button onClick={() => setShowSaveModal(true)} className="ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none">
-                    <div className="ribbon-button-icon mb-1"><Save size={20} className="text-blue-600" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">{t('save')}</span>
-                  </button>
-                  <button onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} className={`ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none ${isSpeechEnabled ? 'bg-primary-light border-primary' : ''}`}>
-                    <div className="ribbon-button-icon mb-1">{isSpeechEnabled ? <Volume2 size={20} className="text-red-600" /> : <VolumeX size={20} className="text-slate-400" />}</div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Speech</span>
-                  </button>
-                  <button onClick={handleAboutPress} className="ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none">
-                    <div className="ribbon-button-icon mb-1"><Info size={20} className="text-blue-500" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">About</span>
-                  </button>
-                </div>
-                <div className="text-[8px] text-slate-400 uppercase font-bold tracking-widest">Actions</div>
+              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
+                <button onClick={() => setShowSaveModal(true)} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
+                  <Save size={14} className="text-blue-600" />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">{t('save')}</span>
+                </button>
+                <button onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isSpeechEnabled ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
+                  {isSpeechEnabled ? <Volume2 size={14} className="text-emerald-400" /> : <VolumeX size={14} className="text-slate-400" />}
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Speech</span>
+                </button>
+                <button onClick={handleAboutPress} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
+                  <Info size={14} className="text-blue-500" />
+                  <span className="text-[7px] font-black uppercase mt-0.5">About</span>
+                </button>
               </div>
             </>
           )}
 
           {activeRibbonTab === 'View' && (
             <>
-              <div className="ribbon-group flex flex-col items-center gap-1 pr-6 border-r border-slate-100">
-                <div className="flex gap-0.5">
-                  <button onClick={toggleNightMode} className={`ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none ${isNightMode ? 'bg-primary-light border-primary' : ''}`}>
-                    <div className="ribbon-button-icon mb-1">{isNightMode ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} className="text-slate-400" />}</div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Night Mode</span>
-                  </button>
-                  <button className="ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none">
-                    <div className="ribbon-button-icon mb-1"><Eye size={20} className="text-emerald-500" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Comfort</span>
-                  </button>
-                </div>
-                <div className="text-[8px] text-slate-400 uppercase font-bold tracking-widest">Display</div>
+              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
+                <button onClick={toggleNightMode} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isNightMode ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
+                  {isNightMode ? <Sun size={14} className="text-amber-500" /> : <Moon size={14} className="text-slate-400" />}
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Night Mode</span>
+                </button>
+                <button onClick={toggleEyeComfort} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isEyeComfort ? 'bg-emerald-500 text-white' : 'text-slate-700'}`}>
+                  <Eye size={14} className={isEyeComfort ? 'text-white' : 'text-emerald-500'} />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Comfort</span>
+                </button>
               </div>
-              <div className="ribbon-group flex flex-col items-center gap-1 pr-6 border-r border-slate-100">
-                <div className="flex gap-0.5">
-                  <button onClick={() => setIsSpeechEnabled(true)} className={`ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none ${isSpeechEnabled ? 'bg-primary-light border-primary' : ''}`}>
-                    <div className="ribbon-button-icon mb-1"><Volume2 size={20} className="text-blue-500" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">On</span>
-                  </button>
-                  <button onClick={() => setIsSpeechEnabled(false)} className={`ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none ${!isSpeechEnabled ? 'bg-primary-light border-primary' : ''}`}>
-                    <div className="ribbon-button-icon mb-1"><VolumeX size={20} className="text-slate-400" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Off</span>
-                  </button>
-                </div>
-                <div className="text-[8px] text-slate-400 uppercase font-bold tracking-widest">Audio Feedback</div>
+              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
+                <button onClick={() => setIsSpeechEnabled(true)} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isSpeechEnabled ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
+                  <Volume2 size={14} className={isSpeechEnabled ? 'text-white' : 'text-blue-500'} />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Voice On</span>
+                </button>
+                <button onClick={() => setIsSpeechEnabled(false)} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${!isSpeechEnabled ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
+                  <VolumeX size={14} className={!isSpeechEnabled ? 'text-white' : 'text-slate-400'} />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Voice Off</span>
+                </button>
               </div>
             </>
           )}
 
           {activeRibbonTab === 'Settings' && (
             <>
-              <div className="ribbon-group flex flex-col items-center gap-1 pr-6 border-r border-slate-100">
-                <div className="flex gap-0.5">
-                  <button onClick={() => setLanguage('en')} className={`ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none ${language === 'en' ? 'bg-primary-light border-primary' : ''}`}>
-                    <div className="ribbon-button-icon mb-1"><Languages size={20} className="text-blue-500" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">English</span>
-                  </button>
-                  <button onClick={() => setLanguage('sw')} className={`ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-primary-light hover:border-primary transition-none ${language === 'sw' ? 'bg-primary-light border-primary' : ''}`}>
-                    <div className="ribbon-button-icon mb-1"><Languages size={20} className="text-red-500" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Swahili</span>
-                  </button>
-                </div>
-                <div className="text-[8px] text-slate-400 uppercase font-bold tracking-widest">Language</div>
+              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
+                <button onClick={() => setLanguage('en')} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${language === 'en' ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
+                  <Languages size={14} className={language === 'en' ? 'text-white' : 'text-blue-500'} />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">English</span>
+                </button>
+                <button onClick={() => setLanguage('sw')} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${language === 'sw' ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
+                  <Languages size={14} className={language === 'sw' ? 'text-white' : 'text-red-500'} />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Swahili</span>
+                </button>
               </div>
-              <div className="ribbon-group flex flex-col items-center gap-1 pr-6 border-r border-slate-100">
-                <div className="flex gap-0.5">
-                  <button onClick={() => setSavedPatients([])} className="ribbon-button flex flex-col items-center justify-center min-w-[56px] p-1 border border-transparent hover:bg-red-50 hover:border-red-500 transition-none">
-                    <div className="ribbon-button-icon mb-1"><Trash2 size={20} className="text-red-500" /></div>
-                    <span className="ribbon-button-label text-[9px] font-bold text-slate-700 uppercase tracking-tighter">Clear All</span>
-                  </button>
-                </div>
-                <div className="text-[8px] text-slate-400 uppercase font-bold tracking-widest">System</div>
+              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
+                <button onClick={() => setShowPasswordChange(true)} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
+                  <Lock size={14} className="text-slate-800" />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Security</span>
+                </button>
+                <button onClick={readLogs} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
+                  <ShieldCheck size={14} className="text-red-600" />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Logs</span>
+                </button>
+                <button onClick={handleLogout} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-red-50 text-slate-700">
+                  <X size={14} className="text-red-500" />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Logout</span>
+                </button>
+                <button onClick={() => {
+                  setSavedPatients([]);
+                  logGuestAction('Cleared all patient records from the database');
+                }} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-red-50 text-slate-700">
+                  <Trash2 size={14} className="text-red-500" />
+                  <span className="text-[7px] font-bold uppercase mt-0.5">Reset</span>
+                </button>
               </div>
             </>
           )}
-        </div>
-      </header>
+        </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {renderContent()}
+      <main className="flex-1 overflow-y-auto bg-slate-50 p-4">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-md min-h-full p-6">
+          {renderContent()}
+        </div>
       </main>
 
-      {/* Mobile Bottom Nav - Only visible on small screens */}
-      <nav className="bottom-nav lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-40">
-        <div className="flex justify-around items-center h-14 max-w-7xl mx-auto">
-          {[...BOTTOM_NAV_SECTIONS, { id: 'patients', name: t('records'), icon: <FolderOpen size={18} /> }].map((s) => (
-            <button 
-              key={s.id} 
-              onClick={() => setActiveTab(s.id)} 
-              className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-none ${activeTab === s.id ? 'bg-primary-light text-primary border-t border-primary' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              {s.icon}
-              <span className="font-bold text-[9px] uppercase tracking-tighter">{s.name}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
     </div>
   );
 };

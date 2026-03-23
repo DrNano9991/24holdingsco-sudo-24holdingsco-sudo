@@ -29,6 +29,11 @@ const TaskList: React.FC = () => {
     setTasks([...tasks, task]);
     setNewTask('');
     
+    // @ts-ignore - logGuestAction is passed or available globally? 
+    // Actually I should probably pass it or use a custom event.
+    // Let's use a custom event to communicate with App.tsx
+    window.dispatchEvent(new CustomEvent('guest-action', { detail: `Added clinical task: ${task.text}${patient ? ` for patient ${patient.name}` : ''}` }));
+    
     const message = `Task registered: ${task.text}${patient ? ` for patient ${patient.name}` : ''}.`;
     speechService.speak(message);
   };
@@ -38,6 +43,9 @@ const TaskList: React.FC = () => {
       if (t.id === id) {
         const newState = !t.completed;
         const message = `Task ${t.text} marked as ${newState ? 'executed' : 'pending'}.`;
+        
+        window.dispatchEvent(new CustomEvent('guest-action', { detail: `Marked task "${t.text}" as ${newState ? 'executed' : 'pending'}` }));
+        
         speechService.speak(message);
         return { 
           ...t, 
@@ -53,6 +61,7 @@ const TaskList: React.FC = () => {
     const task = tasks.find(t => t.id === id);
     if (task) {
       speechService.speak(`Task ${task.text} deleted.`);
+      window.dispatchEvent(new CustomEvent('guest-action', { detail: `Deleted task: ${task.text}` }));
     }
     setTasks(tasks.filter(t => t.id !== id));
   };
@@ -197,7 +206,7 @@ const TaskList: React.FC = () => {
           </div>
           
           <div className="space-y-4">
-            <div className="flex gap-0 border border-border">
+            <div className="flex gap-1 border border-border p-1 bg-slate-50">
               <input 
                 type="text" 
                 value={newTask}
@@ -206,7 +215,7 @@ const TaskList: React.FC = () => {
                 placeholder="Describe the task (e.g., Administer IV fluids)..."
                 className="flex-1 bg-white px-3 py-2 font-bold text-sm outline-none focus:bg-slate-50 transition-none text-slate-900 placeholder:text-slate-400"
               />
-              <button onClick={addTask} className="bg-primary text-white px-6 border-l border-border hover:bg-primary-dark transition-none font-bold text-xs uppercase tracking-widest">
+              <button onClick={addTask} className="bg-slate-800 text-white px-6 border-l border-border hover:bg-slate-700 transition-none font-bold text-xs uppercase tracking-widest">
                 Add
               </button>
             </div>
@@ -240,14 +249,14 @@ const TaskList: React.FC = () => {
 
       {/* Task List Controls */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-0 border border-border">
+        <div className="flex gap-1 border border-border p-1 bg-slate-50">
           {(['all', 'pending', 'executed'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 border-r border-border last:border-r-0 text-[10px] font-bold uppercase tracking-widest transition-none ${
+              className={`px-4 py-1.5 border border-border text-[10px] font-bold uppercase tracking-widest transition-none ${
                 filter === f 
-                  ? 'bg-primary-light text-primary outline-1 outline-primary z-10' 
+                  ? 'bg-slate-400 text-white border-slate-500 z-10' 
                   : 'bg-white text-slate-500 hover:bg-slate-50'
               }`}
             >
@@ -268,7 +277,7 @@ const TaskList: React.FC = () => {
             className={`bg-white border border-border p-3 flex items-center justify-between transition-none group ${task.completed ? 'opacity-70 bg-slate-50/50' : 'hover:bg-slate-50'}`}
           >
             <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => toggleTask(task.id)}>
-              <div className={`w-8 h-8 border border-border flex items-center justify-center transition-none ${task.completed ? 'bg-primary-light text-primary' : 'bg-white text-slate-300 group-hover:text-primary'}`}>
+              <div className={`w-8 h-8 border border-border flex items-center justify-center transition-none ${task.completed ? 'bg-slate-100 text-slate-600' : 'bg-white text-slate-300 group-hover:text-slate-600'}`}>
                 {task.completed ? <CheckCircle size={16} /> : <Clock size={16} />}
               </div>
               

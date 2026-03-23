@@ -3,11 +3,30 @@ import ECGAnimation from './ECGAnimation';
 import { Activity, ShieldAlert } from 'lucide-react';
 import { useTranslation } from '../contexts/TranslationContext';
 
-const Screensaver: React.FC = () => {
+interface ScreensaverProps {
+  onWake: () => void;
+}
+
+const Screensaver: React.FC<ScreensaverProps> = ({ onWake }) => {
   const { t } = useTranslation();
 
+  useEffect(() => {
+    const handleWake = () => onWake();
+    window.addEventListener('mousedown', handleWake);
+    window.addEventListener('keydown', handleWake);
+    window.addEventListener('touchstart', handleWake);
+    return () => {
+      window.removeEventListener('mousedown', handleWake);
+      window.removeEventListener('keydown', handleWake);
+      window.removeEventListener('touchstart', handleWake);
+    };
+  }, [onWake]);
+
   return (
-    <div className="fixed inset-0 z-[200] bg-[#F3F3F3] flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-500">
+    <div 
+      className="fixed inset-0 z-[200] bg-[#F3F3F3] flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-500 cursor-pointer"
+      onClick={onWake}
+    >
       {/* Content Overlay */}
       <div className="relative z-10 flex flex-col items-center space-y-8 w-full max-w-4xl px-6">
         <div className="text-center space-y-2">

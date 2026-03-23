@@ -11,9 +11,9 @@ export interface SynthesisOptions {
 
 export interface SynthesisResult {
   summary: string;
-  actions: string[];
-  diagnostics: string[];
-  education: string[];
+  actions: string;
+  diagnostics: string;
+  education: string;
   documentation: string;
   riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical';
 }
@@ -54,8 +54,14 @@ export class ClinicalSynthesizer {
         2. Provide a clinical rationale for each medication.
         3. List critical safety warnings (contraindications, interactions, side effects).
         4. Recommend a monitoring plan (labs, vitals, clinical signs).
-        5. DO NOT use markdown characters.
-        6. Ensure dosages are appropriate for the ${ageGroup} age group.
+        
+        FORMATTING RULES:
+        - Use HIERARCHICAL OUTLINES with INDENTATION (4 spaces).
+        - Use ALL-CAPS HEADERS for sections.
+        - Use DOUBLE LINE BREAKS between sections.
+        - AVOID ALL SYMBOLS (no asterisks, no hashes, no dashes, no bullets, no underscores).
+        - Use RAW TEXT only (no markdown).
+        - Ensure a clean, professional, non-rendered appearance.
         
         CRITICAL: If the patient has liver dysfunction (Liver Findings), adjust dosages accordingly.
         CRITICAL: If the patient is pediatric or neonate, ensure weight-based dosing (mg/kg) is specified.
@@ -69,64 +75,49 @@ export class ClinicalSynthesizer {
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              medications: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    dosage: { type: Type.STRING },
-                    frequency: { type: Type.STRING },
-                    duration: { type: Type.STRING },
-                    rationale: { type: Type.STRING }
-                  },
-                  required: ["name", "dosage", "frequency", "duration", "rationale"]
-                }
-              },
-              warnings: { type: Type.ARRAY, items: { type: Type.STRING } },
-              monitoring: { type: Type.ARRAY, items: { type: Type.STRING } }
+              prescriptionText: { type: Type.STRING }
             },
-            required: ["medications", "warnings", "monitoring"]
+            required: ["prescriptionText"]
           }
         }
       });
 
-      return JSON.parse(response.text || "{}");
+      const result = JSON.parse(response.text || "{}");
+      return result.prescriptionText || "UNABLE TO GENERATE PRESCRIPTION";
     } catch (error) {
       console.error("AI Prescription Error:", error);
       return this.localPrescriptionFallback(patientData, ageGroup, customPrompt);
     }
   }
 
-  private localPrescriptionFallback(patientData: any, ageGroup: string, customPrompt: string): any {
-    return {
-      medications: [
-        {
-          name: "IV Normal Saline (0.9%)",
-          dosage: ageGroup === 'Adult' ? "500ml - 1000ml bolus" : "20ml/kg bolus",
-          frequency: "Stat",
-          duration: "Immediate",
-          rationale: "Initial volume resuscitation based on clinical stability indicators."
-        },
-        {
-          name: "Paracetamol",
-          dosage: ageGroup === 'Adult' ? "1g" : "15mg/kg",
-          frequency: "QID (6-hourly)",
-          duration: "3-5 days",
-          rationale: "Analgesia and antipyretic management."
-        }
-      ],
-      warnings: [
-        "Monitor for signs of fluid overload during resuscitation.",
-        "Ensure no known allergies to recommended agents.",
-        "Local AI mode: Dosages are generic and must be verified by a clinician."
-      ],
-      monitoring: [
-        "Hourly vital signs (HR, BP, RR, SpO2)",
-        "Strict fluid balance (Input/Output)",
-        "Repeat clinical assessment in 4 hours"
-      ]
-    };
+  private localPrescriptionFallback(patientData: any, ageGroup: string, customPrompt: string): string {
+    const isPediatric = ageGroup !== 'Adult';
+    
+    return `MEDICATION REGIMEN
+    IV NORMAL SALINE 0.9 PERCENT
+        DOSAGE ${isPediatric ? "20ML PER KG BOLUS" : "500ML TO 1000ML BOLUS"}
+        FREQUENCY STAT
+        DURATION IMMEDIATE
+        RATIONALE INITIAL VOLUME RESUSCITATION BASED ON CLINICAL STABILITY INDICATORS
+
+
+    PARACETAMOL
+        DOSAGE ${isPediatric ? "15MG PER KG" : "1G"}
+        FREQUENCY QID 6 HOURLY
+        DURATION 3 TO 5 DAYS
+        RATIONALE ANALGESIA AND ANTIPYRETIC MANAGEMENT
+
+
+SAFETY WARNINGS
+    MONITOR FOR SIGNS OF FLUID OVERLOAD DURING RESUSCITATION
+    ENSURE NO KNOWN ALLERGIES TO RECOMMENDED AGENTS
+    LOCAL AI MODE DOSAGES ARE GENERIC AND MUST BE VERIFIED BY A CLINICIAN
+
+
+MONITORING PLAN
+    HOURLY VITAL SIGNS HEART RATE BLOOD PRESSURE RESPIRATORY RATE SPO2
+    STRICT FLUID BALANCE INPUT AND OUTPUT
+    REPEAT CLINICAL ASSESSMENT IN 4 HOURS`;
   }
 
   /**
@@ -176,19 +167,24 @@ export class ClinicalSynthesizer {
 
         INSTRUCTIONS:
         1. Provide a nuanced clinical summary that interprets the score in the context of the patient's age and notes. 
-           - DO NOT use any markdown characters (no asterisks, no hashes, no underscores).
-           - Use a well-formatted outline with proper paragraphing.
            - If depth is 'concise', keep it to 2-3 sentences.
            - If depth is 'detailed', provide a comprehensive physiological rationale.
            - Focus primarily on ${options.focus} aspects.
-        2. List immediate life-saving or stabilizing actions if necessary. (Plain text only, no markdown).
-        3. Recommend a targeted diagnostic workup (Labs, Imaging, Monitoring). (Plain text only, no markdown).
-        4. Provide evidence-based education points for the patient or their family. (Plain text only, no markdown).
-        5. Generate a professional, structured medical note (SBAR or SOAP format) suitable for a hospital handover if requested. (Plain text only, no markdown).
+        2. List immediate life-saving or stabilizing actions if necessary.
+        3. Recommend a targeted diagnostic workup (Labs, Imaging, Monitoring).
+        4. Provide evidence-based education points for the patient or their family.
+        5. Generate a professional, structured medical note (SBAR or SOAP format) suitable for a hospital handover if requested.
         6. Assign a risk level: 'Low', 'Moderate', 'High', or 'Critical'.
         
+        FORMATTING RULES:
+        - Use HIERARCHICAL OUTLINES with INDENTATION (4 spaces).
+        - Use ALL-CAPS HEADERS for sections.
+        - Use DOUBLE LINE BREAKS between sections.
+        - AVOID ALL SYMBOLS (no asterisks, no hashes, no dashes, no bullets, no underscores).
+        - Use RAW TEXT only (no markdown).
+        - Ensure a clean, professional, non-rendered appearance.
+        
         CRITICAL: If the score indicates high risk (e.g., MEWS >= 5, qSOFA >= 2, GCS < 8), prioritize urgent escalation.
-        CRITICAL: ABSOLUTELY NO MARKDOWN CHARACTERS IN ANY STRING FIELD.
       `;
 
       const response = await this.ai.models.generateContent({
@@ -200,9 +196,9 @@ export class ClinicalSynthesizer {
             type: Type.OBJECT,
             properties: {
               summary: { type: Type.STRING },
-              actions: { type: Type.ARRAY, items: { type: Type.STRING } },
-              diagnostics: { type: Type.ARRAY, items: { type: Type.STRING } },
-              education: { type: Type.ARRAY, items: { type: Type.STRING } },
+              actions: { type: Type.STRING },
+              diagnostics: { type: Type.STRING },
+              education: { type: Type.STRING },
               documentation: { type: Type.STRING },
               riskLevel: { type: Type.STRING, enum: ['Low', 'Moderate', 'High', 'Critical'] }
             },
@@ -214,9 +210,9 @@ export class ClinicalSynthesizer {
       const result = JSON.parse(response.text || "{}");
       return {
         summary: result.summary || "Unable to generate summary.",
-        actions: result.actions || [],
-        diagnostics: result.diagnostics || [],
-        education: result.education || [],
+        actions: result.actions || "",
+        diagnostics: result.diagnostics || "",
+        education: result.education || "",
         documentation: result.documentation || "",
         riskLevel: result.riskLevel || 'Low'
       };
@@ -233,11 +229,27 @@ export class ClinicalSynthesizer {
     patientData: any,
     options: SynthesisOptions
   ): SynthesisResult {
-    const actions: string[] = [];
-    const diagnostics: string[] = [];
-    const education: string[] = [];
+    let actions = "";
+    let diagnostics = "";
+    let education = "";
     let riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical' = 'Low';
-    let summary = `### Clinical Analysis (Local AI Mode)\n\n**Score Type:** ${scoreType}\n**Calculated Value:** ${value}\n\n**Patient Context:**\n- Age Group: ${patientData.ageGroup}\n- Notes: ${patientData.notes || 'None'}\n\n`;
+    let summary = `CLINICAL ANALYSIS LOCAL AI MODE
+
+
+SCORE TYPE
+    ${scoreType}
+
+
+CALCULATED VALUE
+    ${value}
+
+
+PATIENT CONTEXT
+    AGE GROUP ${patientData.ageGroup}
+    NOTES ${patientData.notes || 'NONE'}
+
+
+`;
 
     const vitals = ScoringEngine.classifyVitals(
       patientData.ageGroup,
@@ -251,132 +263,520 @@ export class ClinicalSynthesizer {
       case 'MEWS':
         if (value >= 5) {
           riskLevel = 'High';
-          summary += `**Clinical Impression:** The patient's Modified Early Warning Score (MEWS) of ${value} indicates a significant risk of clinical deterioration. This threshold typically requires immediate escalation to a senior medical officer or rapid response team.\n\n`;
-          actions.push("Immediate medical review by a senior clinician/registrar", "Consider Rapid Response Team (RRT) or ICU consult", "Increase monitoring frequency to every 15-30 minutes", "Ensure patent IV access (large bore)");
-          diagnostics.push("Urgent Arterial Blood Gas (ABG) for metabolic/respiratory status", "Stat 12-lead ECG and Chest X-ray", "Comprehensive metabolic panel, Lactate level, and Troponin if indicated");
+          summary += `CLINICAL IMPRESSION
+    THE PATIENTS MODIFIED EARLY WARNING SCORE MEWS OF ${value} INDICATES A SIGNIFICANT RISK OF CLINICAL DETERIORATION
+
+
+RECOMMENDATIONS
+    THIS THRESHOLD TYPICALLY REQUIRES IMMEDIATE ESCALATION TO A SENIOR MEDICAL OFFICER OR RAPID RESPONSE TEAM
+
+
+`;
+          actions += `IMMEDIATE ACTIONS
+    IMMEDIATE MEDICAL REVIEW BY A SENIOR CLINICIAN
+    CONSIDER RAPID RESPONSE TEAM OR ICU CONSULT
+    INCREASE MONITORING FREQUENCY TO EVERY 15 TO 30 MINUTES
+    ENSURE PATENT IV ACCESS
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    URGENT ARTERIAL BLOOD GAS
+    STAT 12 LEAD ECG AND CHEST XRAY
+    COMPREHENSIVE METABOLIC PANEL AND LACTATE
+
+
+`;
         } else if (value >= 3) {
           riskLevel = 'Moderate';
-          summary += `**Clinical Impression:** A MEWS score of ${value} suggests a moderate risk. Increased vigilance and clinical review are recommended to identify underlying causes of physiological instability.\n\n`;
-          actions.push("Notify the attending physician", "Increase observation frequency to hourly", "Review fluid balance and medication chart", "Assess for potential sources of infection or occult bleeding");
-          diagnostics.push("Baseline blood work (FBC, U&E, CRP)", "Strict fluid balance monitoring and urine output tracking");
+          summary += `CLINICAL IMPRESSION
+    A MEWS SCORE OF ${value} SUGGESTS A MODERATE RISK
+
+
+RECOMMENDATIONS
+    INCREASED VIGILANCE AND CLINICAL REVIEW ARE RECOMMENDED TO IDENTIFY UNDERLYING CAUSES OF PHYSIOLOGICAL INSTABILITY
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    NOTIFY THE ATTENDING PHYSICIAN
+    INCREASE OBSERVATION FREQUENCY TO HOURLY
+    REVIEW FLUID BALANCE AND MEDICATION CHART
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    BASELINE BLOOD WORK
+    STRICT FLUID BALANCE MONITORING
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** A MEWS score of ${value} indicates a low risk. The patient appears physiologically stable at this time.\n\n`;
-          actions.push("Continue routine 4-hourly observations", "Maintain standard care plan");
+          summary += `CLINICAL IMPRESSION
+    A MEWS SCORE OF ${value} INDICATES A LOW RISK
+
+
+RECOMMENDATIONS
+    THE PATIENT APPEARS PHYSIOLOGICALLY STABLE AT THIS TIME
+
+
+`;
+          actions += `ROUTINE ACTIONS
+    CONTINUE ROUTINE 4 HOURLY OBSERVATIONS
+    MAINTAIN STANDARD CARE PLAN
+
+
+`;
         }
         break;
 
       case 'GCS':
         if (value <= 8) {
           riskLevel = 'Critical';
-          summary += `**Clinical Impression:** A Glasgow Coma Scale (GCS) of ${value} indicates severe neurological impairment. At this level, the patient's protective airway reflexes are likely compromised ('GCS of 8, intubate').\n\n`;
-          actions.push("URGENT: Secure airway (Consider Intubation/Mechanical Ventilation)", "Neurosurgical consultation stat", "Maintain cervical spine immobilization if trauma is suspected", "Implement neuro-protective measures (Head of bed 30°, normothermia)");
-          diagnostics.push("Stat Non-contrast CT Head", "Monitor Intracranial Pressure (ICP) if indicated", "Comprehensive toxicology screen and bedside glucose check");
+          summary += `CLINICAL IMPRESSION
+    A GLASGOW COMA SCALE GCS OF ${value} INDICATES SEVERE NEUROLOGICAL IMPAIRMENT
+
+
+RECOMMENDATIONS
+    AT THIS LEVEL THE PATIENTS PROTECTIVE AIRWAY REFLEXES ARE LIKELY COMPROMISED
+
+
+`;
+          actions += `CRITICAL ACTIONS
+    URGENT SECURE AIRWAY
+    NEUROSURGICAL CONSULTATION STAT
+    MAINTAIN CERVICAL SPINE IMMOBILIZATION
+    IMPLEMENT NEURO PROTECTIVE MEASURES
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    STAT NON CONTRAST CT HEAD
+    MONITOR INTRACRANIAL PRESSURE
+    COMPREHENSIVE TOXICOLOGY SCREEN
+
+
+`;
         } else if (value <= 12) {
           riskLevel = 'High';
-          summary += `**Clinical Impression:** A GCS of ${value} indicates a moderate head injury or significant encephalopathy. Close neurological monitoring is essential to detect early signs of herniation or secondary injury.\n\n`;
-          actions.push("Neurological observations (GCS + Pupils) every 15-30 minutes", "Notify neurosurgical or neurology team", "Avoid hypotension and hypoxia");
-          diagnostics.push("CT Head within 1 hour", "Frequent GCS reassessment", "Check electrolytes (especially Sodium)");
+          summary += `CLINICAL IMPRESSION
+    A GCS OF ${value} INDICATES A MODERATE HEAD INJURY OR SIGNIFICANT ENCEPHALOPATHY
+
+
+RECOMMENDATIONS
+    CLOSE NEUROLOGICAL MONITORING IS ESSENTIAL TO DETEAR EARLY SIGNS OF HERNIATION
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    NEUROLOGICAL OBSERVATIONS EVERY 15 TO 30 MINUTES
+    NOTIFY NEUROSURGICAL OR NEUROLOGY TEAM
+    AVOID HYPOTENSION AND HYPOXIA
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    CT HEAD WITHIN 1 HOUR
+    FREQUENT GCS REASSESSMENT
+    CHECK ELECTROLYTES
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** A GCS of ${value} indicates a mild head injury or minor neurological impairment.\n\n`;
-          actions.push("Neurological observations hourly for 4 hours, then 4-hourly", "Assess for post-concussive symptoms");
-          education.push("Signs of increasing intracranial pressure (worsening headache, vomiting, confusion)", "When to seek emergency care after discharge (Concussion advice)");
+          summary += `CLINICAL IMPRESSION
+    A GCS OF ${value} INDICATES A MILD HEAD INJURY
+
+
+RECOMMENDATIONS
+    ASSESS FOR POST CONCUSSIVE SYMPTOMS
+
+
+`;
+          actions += `ROUTINE ACTIONS
+    NEUROLOGICAL OBSERVATIONS HOURLY FOR 4 HOURS
+    ASSESS FOR POST CONCUSSIVE SYMPTOMS
+
+
+`;
+          education += `PATIENT EDUCATION
+    SIGNS OF INCREASING INTRACRANIAL PRESSURE
+    WHEN TO SEEK EMERGENCY CARE AFTER DISCHARGE
+
+
+`;
         }
         break;
 
       case 'qSOFA':
         if (value >= 2) {
           riskLevel = 'High';
-          summary += `**Clinical Impression:** A quick SOFA (qSOFA) score of ${value} is highly predictive of sepsis-related mortality and prolonged ICU stay. This patient meets the criteria for suspected sepsis with organ dysfunction.\n\n`;
-          actions.push("Initiate Sepsis-6 Protocol immediately", "Administer broad-spectrum antibiotics within 1 hour ('Golden Hour')", "Aggressive fluid resuscitation (30ml/kg crystalloid if hypotensive)", "Oxygen therapy to maintain SpO2 > 94%");
-          diagnostics.push("Blood cultures x2 sets (aerobic/anaerobic) before antibiotics", "Serial Serum Lactate levels (q2-4h if elevated)", "Procalcitonin, CRP, and source-specific imaging (e.g., CXR, CT Abdo)");
+          summary += `CLINICAL IMPRESSION
+    A QUICK SOFA QSOFA SCORE OF ${value} IS HIGHLY PREDICTIVE OF SEPSIS RELATED MORTALITY
+
+
+RECOMMENDATIONS
+    THIS PATIENT MEETS THE CRITERIA FOR SUSPECTED SEPSIS WITH ORGAN DYSFUNCTION
+
+
+`;
+          actions += `SEPSIS PROTOCOL
+    INITIATE SEPSIS 6 PROTOCOL IMMEDIATELY
+    ADMINISTER BROAD SPECTRUM ANTIBIOTICS WITHIN 1 HOUR
+    AGGRESSIVE FLUID RESUSCITATION
+    OXYGEN THERAPY
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    BLOOD CULTURES BEFORE ANTIBIOTICS
+    SERIAL SERUM LACTATE LEVELS
+    PROCALCITONIN AND CRP
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** qSOFA score is ${value}. While not meeting the high-risk threshold for sepsis, clinical suspicion should remain high if an infectious source is suspected.\n\n`;
-          actions.push("Monitor for signs of emerging organ dysfunction", "Re-evaluate qSOFA and full SOFA score frequently", "Screen for infection sources");
+          summary += `CLINICAL IMPRESSION
+    QSOFA SCORE IS ${value}
+
+
+RECOMMENDATIONS
+    WHILE NOT MEETING THE HIGH RISK THRESHOLD CLINICAL SUSPICION SHOULD REMAIN HIGH
+
+
+`;
+          actions += `MONITORING ACTIONS
+    MONITOR FOR SIGNS OF EMERGING ORGAN DYSFUNCTION
+    RE EVALUATE QSOFA FREQUENTLY
+    SCREEN FOR INFECTION SOURCES
+
+
+`;
         }
         break;
 
       case 'SIRS':
         if (value >= 2) {
           riskLevel = 'Moderate';
-          summary += `**Clinical Impression:** The patient meets Systemic Inflammatory Response Syndrome (SIRS) criteria (Score: ${value}). While non-specific, this indicates a significant systemic inflammatory state which may be due to infection, trauma, or inflammation.\n\n`;
-          actions.push("Screen for potential infection (Sepsis screen)", "Monitor vitals closely", "Review white cell count and temperature trends");
-          diagnostics.push("Blood cultures", "Urinalysis and CXR", "Inflammatory markers (CRP/ESR)");
+          summary += `CLINICAL IMPRESSION
+    THE PATIENT MEETS SYSTEMIC INFLAMMATORY RESPONSE SYNDROME SIRS CRITERIA SCORE ${value}
+
+
+RECOMMENDATIONS
+    THIS INDICATES A SIGNIFICANT SYSTEMIC INFLAMMATORY STATE
+
+
+`;
+          actions += `SIRS ACTIONS
+    SCREEN FOR POTENTIAL INFECTION
+    MONITOR VITALS CLOSELY
+    REVIEW WHITE CELL COUNT TRENDS
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    BLOOD CULTURES
+    URINALYSIS AND CXR
+    INFLAMMATORY MARKERS
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** SIRS score is ${value}. No significant systemic inflammatory response detected at this time.\n\n`;
+          summary += `CLINICAL IMPRESSION
+    SIRS SCORE IS ${value}
+
+
+RECOMMENDATIONS
+    NO SIGNIFICANT SYSTEMIC INFLAMMATORY RESPONSE DETECTED
+
+
+`;
         }
         break;
 
       case 'PEWS':
         if (value >= 5) {
           riskLevel = 'Critical';
-          summary += `**Clinical Impression:** A Pediatric Early Warning Score (PEWS) of ${value} in a ${patientData.ageGroup} patient is a critical finding. There is a high risk of rapid respiratory or cardiovascular collapse.\n\n`;
-          actions.push("Immediate Pediatric Rapid Response or Code activation", "Start high-flow oxygen or non-invasive ventilation", "Senior pediatric registrar/consultant review stat", "Prepare for emergency airway management");
-          diagnostics.push("Capillary or Arterial Blood Gas", "Continuous multi-parameter monitoring (ECG, SpO2, NIBP)", "Stat portable Chest X-ray");
+          summary += `CLINICAL IMPRESSION
+    A PEDIATRIC EARLY WARNING SCORE PEWS OF ${value} IS A CRITICAL FINDING
+
+
+RECOMMENDATIONS
+    THERE IS A HIGH RISK OF RAPID RESPIRATORY OR CARDIOVASCULAR COLLAPSE
+
+
+`;
+          actions += `CRITICAL PEDIATRIC ACTIONS
+    IMMEDIATE PEDIATRIC RAPID RESPONSE ACTIVATION
+    START HIGH FLOW OXYGEN
+    SENIOR PEDIATRIC REGISTRAR REVIEW STAT
+    PREPARE FOR EMERGENCY AIRWAY MANAGEMENT
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    CAPILLARY OR ARTERIAL BLOOD GAS
+    CONTINUOUS MULTI PARAMETER MONITORING
+    STAT PORTABLE CHEST XRAY
+
+
+`;
         } else if (value >= 3) {
           riskLevel = 'High';
-          summary += `**Clinical Impression:** A PEWS score of ${value} indicates significant clinical distress in a pediatric patient. This requires urgent escalation and frequent reassessment.\n\n`;
-          actions.push("Urgent pediatric review (within 30 mins)", "Increase monitoring frequency to every 30-60 mins", "Review by senior nursing staff", "Assess for dehydration or respiratory fatigue");
+          summary += `CLINICAL IMPRESSION
+    A PEWS SCORE OF ${value} INDICATES SIGNIFICANT CLINICAL DISTRESS
+
+
+RECOMMENDATIONS
+    THIS REQUIRES URGENT ESCALATION AND FREQUENT REASSESSMENT
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    URGENT PEDIATRIC REVIEW WITHIN 30 MINS
+    INCREASE MONITORING FREQUENCY TO EVERY 30 TO 60 MINS
+    REVIEW BY SENIOR NURSING STAFF
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** PEWS score is ${value}. The pediatric patient appears stable, but continue to monitor for age-specific signs of distress.\n\n`;
-          actions.push("Continue routine pediatric observations", "Ensure adequate hydration and comfort");
+          summary += `CLINICAL IMPRESSION
+    PEWS SCORE IS ${value}
+
+
+RECOMMENDATIONS
+    THE PEDIATRIC PATIENT APPEARS STABLE
+
+
+`;
+          actions += `ROUTINE ACTIONS
+    CONTINUE ROUTINE PEDIATRIC OBSERVATIONS
+    ENSURE ADEQUATE HYDRATION
+
+
+`;
         }
         break;
 
       case 'CURB-65':
         if (value >= 3) {
           riskLevel = 'High';
-          summary += `**Clinical Impression:** A CURB-65 score of ${value} indicates severe community-acquired pneumonia. This patient has a high risk of mortality (up to 27%) and typically requires inpatient management, often in a high-dependency or intensive care setting.\n\n`;
-          actions.push("Urgent hospital admission", "Consider ICU/HDU admission if score is 4-5", "Start IV broad-spectrum antibiotics immediately", "Assess for supplemental oxygen requirements");
-          diagnostics.push("Chest X-ray", "Sputum and Blood cultures", "Legionella and Pneumococcal urinary antigen tests", "Urea and Electrolytes");
+          summary += `CLINICAL IMPRESSION
+    A CURB 65 SCORE OF ${value} INDICATES SEVERE COMMUNITY ACQUIRED PNEUMONIA
+
+
+RECOMMENDATIONS
+    THIS PATIENT HAS A HIGH RISK OF MORTALITY AND TYPICALLY REQUIRES INPATIENT MANAGEMENT
+
+
+`;
+          actions += `PNEUMONIA ACTIONS
+    URGENT HOSPITAL ADMISSION
+    CONSIDER ICU HDU ADMISSION
+    START IV BROAD SPECTRUM ANTIBIOTICS IMMEDIATELY
+    ASSESS FOR SUPPLEMENTAL OXYGEN
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    CHEST XRAY
+    SPUTUM AND BLOOD CULTURES
+    URINARY ANTIGEN TESTS
+    UREA AND ELECTROLYTES
+
+
+`;
         } else if (value === 2) {
           riskLevel = 'Moderate';
-          summary += `**Clinical Impression:** A CURB-65 score of 2 indicates moderate severity pneumonia. Mortality risk is approximately 6.8%. Short-stay inpatient care or very close outpatient follow-up is warranted.\n\n`;
-          actions.push("Consider hospital-based care (short stay)", "Initiate appropriate antibiotic therapy", "Monitor for clinical improvement over 24-48 hours");
+          summary += `CLINICAL IMPRESSION
+    A CURB 65 SCORE OF 2 INDICATES MODERATE SEVERITY PNEUMONIA
+
+
+RECOMMENDATIONS
+    SHORT STAY INPATIENT CARE OR VERY CLOSE OUTPATIENT FOLLOW UP IS WARRANTED
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    CONSIDER HOSPITAL BASED CARE
+    INITIATE APPROPRIATE ANTIBIOTIC THERAPY
+    MONITOR FOR CLINICAL IMPROVEMENT
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** A CURB-65 score of ${value} indicates low severity pneumonia. Mortality risk is low (<2%).\n\n`;
-          actions.push("Consider home-based treatment with oral antibiotics", "Provide clear safety-netting instructions");
+          summary += `CLINICAL IMPRESSION
+    A CURB 65 SCORE OF ${value} INDICATES LOW SEVERITY PNEUMONIA
+
+
+RECOMMENDATIONS
+    CONSIDER HOME BASED TREATMENT WITH ORAL ANTIBIOTICS
+
+
+`;
+          actions += `ROUTINE ACTIONS
+    CONSIDER HOME BASED TREATMENT
+    PROVIDE CLEAR SAFETY NETTING INSTRUCTIONS
+
+
+`;
         }
         break;
 
       case 'Wells PE':
         if (value > 4) {
           riskLevel = 'High';
-          summary += `**Clinical Impression:** A Wells score of ${value} indicates that Pulmonary Embolism (PE) is LIKELY. Diagnostic imaging is required to confirm or rule out the diagnosis.\n\n`;
-          actions.push("Initiate empirical anticoagulation if no high-risk bleeding contraindications", "Urgent specialist review (Pulmonology/Hematology)", "Monitor for signs of right heart strain");
-          diagnostics.push("CT Pulmonary Angiogram (CTPA) is the gold standard", "V/Q scan if CTPA is contraindicated (e.g., renal failure, contrast allergy)", "Bedside Echocardiogram to assess right ventricular function");
+          summary += `CLINICAL IMPRESSION
+    A WELLS SCORE OF ${value} INDICATES THAT PULMONARY EMBOLISM PE IS LIKELY
+
+
+RECOMMENDATIONS
+    DIAGNOSTIC IMAGING IS REQUIRED TO CONFIRM THE DIAGNOSIS
+
+
+`;
+          actions += `PE ACTIONS
+    INITIATE EMPIRICAL ANTICOAGULATION
+    URGENT SPECIALIST REVIEW
+    MONITOR FOR SIGNS OF RIGHT HEART STRAIN
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    CT PULMONARY ANGIOGRAM CTPA
+    VQ SCAN IF CTPA IS CONTRAINDICATED
+    BEDSIDE ECHOCARDIOGRAM
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** A Wells score of ${value} indicates that Pulmonary Embolism is UNLIKELY.\n\n`;
-          actions.push("Use D-dimer to rule out PE");
-          diagnostics.push("High-sensitivity D-dimer assay", "If D-dimer is negative, PE can be safely ruled out without further imaging");
+          summary += `CLINICAL IMPRESSION
+    A WELLS SCORE OF ${value} INDICATES THAT PULMONARY EMBOLISM IS UNLIKELY
+
+
+RECOMMENDATIONS
+    USE D DIMER TO RULE OUT PE
+
+
+`;
+          actions += `ROUTINE ACTIONS
+    USE D DIMER TO RULE OUT PE
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    HIGH SENSITIVITY D DIMER ASSAY
+
+
+`;
         }
         break;
 
       case 'CHA₂DS₂-VASc':
         if (value >= 2) {
           riskLevel = 'Moderate';
-          summary += `**Clinical Impression:** A CHA₂DS₂-VASc score of ${value} indicates a high risk of thromboembolism in the setting of Atrial Fibrillation. Annual stroke risk is significantly elevated, warranting preventative therapy.\n\n`;
-          actions.push("Oral anticoagulation (DOAC or Warfarin) is strongly recommended", "Review for bleeding risk (HAS-BLED score)", "Optimize blood pressure control");
+          summary += `CLINICAL IMPRESSION
+    A CHADS VASC SCORE OF ${value} INDICATES A HIGH RISK OF THROMBOEMBOLISM
+
+
+RECOMMENDATIONS
+    ORAL ANTICOAGULATION IS STRONGLY RECOMMENDED
+
+
+`;
+          actions += `AF ACTIONS
+    ORAL ANTICOAGULATION IS STRONGLY RECOMMENDED
+    REVIEW FOR BLEEDING RISK
+    OPTIMIZE BLOOD PRESSURE CONTROL
+
+
+`;
         } else if (value === 1 && patientData.ageGroup !== 'Female') {
-          summary += `**Clinical Impression:** A CHA₂DS₂-VASc score of 1 indicates a moderate risk of stroke.\n\n`;
-          actions.push("Consider oral anticoagulation based on individual patient factors and preferences", "Discuss risks vs benefits of therapy with the patient");
+          summary += `CLINICAL IMPRESSION
+    A CHADS VASC SCORE OF 1 INDICATES A MODERATE RISK OF STROKE
+
+
+RECOMMENDATIONS
+    CONSIDER ORAL ANTICOAGULATION BASED ON INDIVIDUAL FACTORS
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    CONSIDER ORAL ANTICOAGULATION
+    DISCUSS RISKS VS BENEFITS
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** A CHA₂DS₂-VASc score of ${value} indicates a low risk of stroke.\n\n`;
-          actions.push("No antithrombotic therapy or Aspirin may be considered", "Focus on managing modifiable risk factors");
+          summary += `CLINICAL IMPRESSION
+    A CHADS VASC SCORE OF ${value} INDICATES A LOW RISK OF STROKE
+
+
+RECOMMENDATIONS
+    NO ANTITHROMBOTIC THERAPY OR ASPIRIN MAY BE CONSIDERED
+
+
+`;
+          actions += `ROUTINE ACTIONS
+    NO ANTITHROMBOTIC THERAPY
+    MANAGE MODIFIABLE RISK FACTORS
+
+
+`;
         }
         break;
 
       case 'ARISCAT':
         if (value >= 45) {
           riskLevel = 'High';
-          summary += `**Clinical Impression:** An ARISCAT score of ${value} indicates a high risk of postoperative respiratory complications (approximately 50% incidence). Pre-operative and post-operative optimization is critical.\n\n`;
-          actions.push("Pre-operative optimization of respiratory status (e.g., smoking cessation, bronchodilators)", "Consider post-operative ICU/HDU admission for monitoring", "Aggressive chest physiotherapy and early mobilization");
-          diagnostics.push("Pre-operative Pulmonary Function Tests (PFTs)", "Baseline ABG");
+          summary += `CLINICAL IMPRESSION
+    AN ARISCAT SCORE OF ${value} INDICATES A HIGH RISK OF POSTOPERATIVE RESPIRATORY COMPLICATIONS
+
+
+RECOMMENDATIONS
+    PRE OPERATIVE AND POST OPERATIVE OPTIMIZATION IS CRITICAL
+
+
+`;
+          actions += `ARISCAT ACTIONS
+    PRE OPERATIVE OPTIMIZATION OF RESPIRATORY STATUS
+    CONSIDER POST OPERATIVE ICU HDU ADMISSION
+    AGGRESSIVE CHEST PHYSIOTHERAPY
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    PRE OPERATIVE PULMONARY FUNCTION TESTS
+    BASELINE ABG
+
+
+`;
         } else if (value >= 26) {
           riskLevel = 'Moderate';
-          summary += `**Clinical Impression:** An ARISCAT score of ${value} indicates an intermediate risk of complications (approximately 13%).\n\n`;
-          actions.push("Post-operative incentive spirometry", "Early mobilization and adequate analgesia to prevent splinting");
+          summary += `CLINICAL IMPRESSION
+    AN ARISCAT SCORE OF ${value} INDICATES AN INTERMEDIATE RISK OF COMPLICATIONS
+
+
+RECOMMENDATIONS
+    POST OPERATIVE INCENTIVE SPIROMETRY RECOMMENDED
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    POST OPERATIVE INCENTIVE SPIROMETRY
+    EARLY MOBILIZATION AND ADEQUATE ANALGESIA
+
+
+`;
         } else {
-          summary += `**Clinical Impression:** An ARISCAT score of ${value} indicates a low risk of postoperative respiratory complications (~1.6%).\n\n`;
+          summary += `CLINICAL IMPRESSION
+    AN ARISCAT SCORE OF ${value} INDICATES A LOW RISK OF POSTOPERATIVE RESPIRATORY COMPLICATIONS
+
+
+RECOMMENDATIONS
+    CONTINUE ROUTINE POST OPERATIVE CARE
+
+
+`;
         }
         break;
 
@@ -385,21 +785,45 @@ export class ClinicalSynthesizer {
         const key = scoreType.toLowerCase().replace(/[^a-z0-9]/g, '_');
         const knowledge = (MEDICAL_KNOWLEDGE.scores as any)[key];
         if (knowledge) {
-          summary += `**Clinical Impression (${knowledge.name}):** ${knowledge.description}\n\n`;
+          summary += `CLINICAL IMPRESSION ${knowledge.name.toUpperCase()}
+    ${knowledge.description.toUpperCase()}
+
+
+`;
           if (knowledge.recommendations) {
-            actions.push(...knowledge.recommendations);
+            actions += `RECOMMENDATIONS
+    ${knowledge.recommendations.map((r: string) => r.toUpperCase()).join('\n    ')}
+
+
+`;
           }
           // Basic risk mapping if possible
           if (knowledge.interpretation) {
             const entry = knowledge.interpretation[value] || knowledge.interpretation[String(value)];
             if (entry) {
-              summary += `**Interpretation:** ${entry.message || entry.risk || ''} (Mortality: ${entry.mortality || 'N/A'})\n\n`;
+              summary += `INTERPRETATION
+    ${(entry.message || entry.risk || '').toUpperCase()} MORTALITY ${entry.mortality || 'NA'}
+
+
+`;
               if (entry.risk) riskLevel = entry.risk as any;
-              if (entry.action) actions.push(entry.action);
+              if (entry.action) actions += `REQUIRED ACTION
+    ${entry.action.toUpperCase()}
+
+
+`;
             }
           }
         } else {
-          summary += `**Clinical Impression:** A clinical score of ${value} was calculated using the ${scoreType} system. Please interpret this result within the broader context of the patient's history, physical examination, and clinical trajectory.\n\n`;
+          summary += `CLINICAL IMPRESSION
+    A CLINICAL SCORE OF ${value} WAS CALCULATED USING THE ${scoreType} SYSTEM
+
+
+RECOMMENDATIONS
+    PLEASE INTERPRET THIS RESULT WITHIN THE BROADER CONTEXT OF THE PATIENT HISTORY
+
+
+`;
         }
     }
 
@@ -409,48 +833,119 @@ export class ClinicalSynthesizer {
       const liver = patientData.liver;
 
       if (jvp > 8 || capRefill > 2 || skinTurgor !== 'Normal' || mucosa !== 'Moist' || pulseGrade < 2 || muscleStrength < 5 || (liver && (liver.ascites > 1 || liver.encephalopathy > 1))) {
-        summary += `**Granular Physical Exam Findings:**\n`;
+        summary += `GRANULAR PHYSICAL EXAM FINDINGS
+
+
+`;
         
         // Hemodynamic/Fluid Status
         if (jvp > 8) {
-          summary += `- **Elevated JVP (${jvp} mmHg):** Suggests central venous congestion, potentially due to right heart failure or fluid overload.\n`;
-          actions.push("Assess for peripheral edema and hepatomegaly", "Consider diuretic therapy if fluid overloaded");
+          summary += `    ELEVATED JVP ${jvp} MMHG
+        SUGGESTS CENTRAL VENOUS CONGESTION POTENTIALLY DUE TO RIGHT HEART FAILURE
+
+
+`;
+          actions += `HEMODYNAMIC ACTIONS
+    ASSESS FOR PERIPHERAL EDEMA
+    CONSIDER DIURETIC THERAPY
+
+
+`;
         }
         if (capRefill > 2) {
-          summary += `- **Prolonged Capillary Refill (${capRefill}s):** Indicates poor peripheral tissue perfusion; consider shock states (hypovolemic, cardiogenic, or distributive).\n`;
-          actions.push("Evaluate for other signs of shock (cool extremities, narrow pulse pressure)");
+          summary += `    PROLONGED CAPILLARY REFILL ${capRefill}S
+        INDICATES POOR PERIPHERAL TISSUE PERFUSION
+
+
+`;
+          actions += `PERFUSION ACTIONS
+    EVALUATE FOR OTHER SIGNS OF SHOCK
+
+
+`;
         }
         if (skinTurgor !== 'Normal' || mucosa !== 'Moist') {
-          summary += `- **Signs of Dehydration:** ${skinTurgor} skin turgor and ${mucosa} mucosa suggest significant volume depletion.\n`;
-          actions.push("Initiate appropriate fluid resuscitation", "Monitor urine output (target > 0.5ml/kg/hr)");
+          summary += `    SIGNS OF DEHYDRATION
+        ${skinTurgor.toUpperCase()} SKIN TURGOR AND ${mucosa.toUpperCase()} MUCOSA SUGGEST VOLUME DEPLETION
+
+
+`;
+          actions += `FLUID ACTIONS
+    INITIATE APPROPRIATE FLUID RESUSCITATION
+    MONITOR URINE OUTPUT
+
+
+`;
         }
         
         // Vascular/Neuromuscular
         if (pulseGrade === 0) {
-          summary += `- **Absent Pulses (Grade 0):** Critical finding suggesting acute limb ischemia or profound circulatory collapse.\n`;
+          summary += `    ABSENT PULSES GRADE 0
+        CRITICAL FINDING SUGGESTING ACUTE LIMB ISCHEMIA
+
+
+`;
           riskLevel = 'Critical';
-          actions.unshift("URGENT: Vascular surgery consult or ACLS activation");
+          actions = `URGENT ACTIONS
+    URGENT VASCULAR SURGERY CONSULT
+
+
+` + actions;
         } else if (pulseGrade === 1) {
-          summary += `- **Weak/Thready Pulses (Grade 1):** Suggests low stroke volume or peripheral arterial disease.\n`;
+          summary += `    WEAK THREADY PULSES GRADE 1
+        SUGGESTS LOW STROKE VOLUME
+
+
+`;
         }
         
         if (muscleStrength < 3) {
-          summary += `- **Significant Muscle Weakness (Grade ${muscleStrength}/5):** Patient cannot move against gravity. Requires urgent neurological/metabolic evaluation.\n`;
-          actions.push("Check electrolytes (Potassium, Magnesium, Calcium)", "Consider neurological imaging if focal");
+          summary += `    SIGNIFICANT MUSCLE WEAKNESS GRADE ${muscleStrength} OUT OF 5
+        PATIENT CANNOT MOVE AGAINST GRAVITY
+
+
+`;
+          actions += `NEUROMUSCULAR ACTIONS
+    CHECK ELECTROLYTES
+    CONSIDER NEUROLOGICAL IMAGING
+
+
+`;
         } else if (muscleStrength < 5) {
-          summary += `- **Mild Muscle Weakness (Grade ${muscleStrength}/5):** Reduced strength against resistance.\n`;
+          summary += `    MILD MUSCLE WEAKNESS GRADE ${muscleStrength} OUT OF 5
+        REDUCED STRENGTH AGAINST RESISTANCE
+
+
+`;
         }
 
         // Liver specific findings
         if (liver) {
           if (liver.ascites > 1) {
-            summary += `- **Ascites (${liver.ascites === 2 ? 'Mild' : 'Severe'}):** Indicates portal hypertension or advanced liver disease.\n`;
-            diagnostics.push("Diagnostic paracentesis to rule out Spontaneous Bacterial Peritonitis (SBP)");
+            summary += `    ASCITES ${liver.ascites === 2 ? 'MILD' : 'SEVERE'}
+        INDICATES PORTAL HYPERTENSION
+
+
+`;
+            diagnostics += `LIVER WORKUP
+    DIAGNOSTIC PARACENTESIS
+
+
+`;
           }
           if (liver.encephalopathy > 1) {
-            summary += `- **Hepatic Encephalopathy (Grade ${liver.encephalopathy === 2 ? '1-2' : '3-4'}):** Significant neuro-metabolic complication.\n`;
+            summary += `    HEPATIC ENCEPHALOPATHY GRADE ${liver.encephalopathy === 2 ? '1 TO 2' : '3 TO 4'}
+        SIGNIFICANT NEURO METABOLIC COMPLICATION
+
+
+`;
             riskLevel = liver.encephalopathy === 3 ? 'Critical' : 'High';
-            actions.push("Initiate Lactulose and Rifaximin", "Monitor airway if GCS drops");
+            actions += `ENCEPHALOPATHY ACTIONS
+    INITIATE LACTULOSE AND RIFAXIMIN
+    MONITOR AIRWAY
+
+
+`;
           }
         }
 
@@ -461,20 +956,38 @@ export class ClinicalSynthesizer {
           if (waist && height) {
             const ratio = Number(waist) / Number(height);
             if (ratio > 0.5) {
-              summary += `- **Increased Cardiometabolic Risk:** Waist-to-height ratio is ${ratio.toFixed(2)} (Normal < 0.5).\n`;
-              education.push("Discuss weight management and metabolic health optimization");
+              summary += `    INCREASED CARDIOMETABOLIC RISK
+        WAIST TO HEIGHT RATIO IS ${ratio.toFixed(2)}
+
+
+`;
+              education += `METABOLIC EDUCATION
+    DISCUSS WEIGHT MANAGEMENT
+
+
+`;
             }
           }
 
           if (weight && height) {
             const bmi = ScoringEngine.calculateBMI(weight, height);
             if (bmi) {
-              summary += `- **Body Mass Index (BMI):** ${bmi} kg/m².\n`;
+              summary += `    BODY MASS INDEX BMI
+        ${bmi} KG PER M2
+
+
+`;
               if (bmi >= 30) {
-                summary += `  - **Clinical Note:** Patient is in the obese range, which significantly increases risk for metabolic syndrome and cardiovascular disease.\n`;
+                summary += `        PATIENT IS IN THE OBESE RANGE
+
+
+`;
                 riskLevel = riskLevel === 'Low' ? 'Moderate' : riskLevel;
               } else if (bmi < 18.5) {
-                summary += `  - **Clinical Note:** Patient is underweight; assess for nutritional deficiencies or chronic wasting diseases.\n`;
+                summary += `        PATIENT IS UNDERWEIGHT
+
+
+`;
               }
             }
           }
@@ -482,29 +995,53 @@ export class ClinicalSynthesizer {
           if (waist && hip) {
             const whr = ScoringEngine.calculateWHR(waist, hip);
             if (whr) {
-              summary += `- **Waist-to-Hip Ratio:** ${whr} (Normal < 0.9 for men, < 0.85 for women).\n`;
+              summary += `    WAIST TO HIP RATIO
+        ${whr}
+
+
+`;
               if (whr > 0.9) {
-                summary += `  - **Clinical Note:** Elevated WHR indicates central adiposity and increased metabolic risk.\n`;
+                summary += `        ELEVATED WHR INDICATES CENTRAL ADIPOSITY
+
+
+`;
               }
             }
           }
         }
-        summary += `\n`;
       }
     }
 
     // Vital Sign Integration
     if (vitals.hr.severity === 'Critical' || vitals.rr.severity === 'Critical' || vitals.sbp.severity === 'Critical') {
       riskLevel = 'Critical';
-      summary += `**HEMODYNAMIC ALERT:** One or more vital signs are in the **CRITICAL** range. Physiological stabilization must be the immediate priority, regardless of the calculated score.\n\n`;
-      actions.unshift("URGENT: Stabilize vital signs immediately (Airway, Breathing, Circulation)");
+      summary += `HEMODYNAMIC ALERT
+    ONE OR MORE VITAL SIGNS ARE IN THE CRITICAL RANGE
+    PHYSIOLOGICAL STABILIZATION MUST BE THE IMMEDIATE PRIORITY
+
+
+`;
+      actions = `URGENT ACTIONS
+    URGENT STABILIZE VITAL SIGNS IMMEDIATELY
+
+
+` + actions;
     }
 
     // Focus-specific adjustments
     if (options.focus === 'educational') {
-      education.push(...this.getGeneralEducation(scoreType, riskLevel));
+      education += `GENERAL EDUCATION
+    ${this.getGeneralEducation(scoreType, riskLevel).map(e => e.toUpperCase()).join('\n    ')}
+
+
+`;
     } else if (options.focus === 'therapeutic') {
-      actions.push("Review current medication list for potential nephrotoxins or contributors", "Optimize pain management and comfort");
+      actions += `THERAPEUTIC ACTIONS
+    REVIEW CURRENT MEDICATION LIST
+    OPTIMIZE PAIN MANAGEMENT
+
+
+`;
     }
 
     // Apply depth options to local summary
@@ -512,15 +1049,36 @@ export class ClinicalSynthesizer {
       const lines = summary.split('\n\n');
       summary = (lines[0] || '') + '\n\n' + (lines[1] || '');
     } else if (options.depth === 'detailed') {
-      summary += `\n**Physiological Rationale:** The calculated ${scoreType} score of ${value} reflects the cumulative burden of physiological derangement. In ${patientData.ageGroup} patients, compensatory mechanisms may mask early decline, making serial assessment vital.`;
+      summary += `PHYSIOLOGICAL RATIONALE
+    THE CALCULATED ${scoreType} SCORE OF ${value} REFLECTS THE CUMULATIVE BURDEN OF PHYSIOLOGICAL DERANGEMENT
+    IN ${patientData.ageGroup.toUpperCase()} PATIENTS COMPENSATORY MECHANISMS MAY MASK EARLY DECLINE
+
+
+`;
     }
 
     return {
       summary,
-      actions: [...new Set(actions)].slice(0, 8), // Unique and capped
-      diagnostics: [...new Set(diagnostics)].slice(0, 6),
-      education: [...new Set(education)].slice(0, 5),
-      documentation: `LOCAL AI SYNTHESIS - ${new Date().toLocaleString()}\nSCORE: ${scoreType}=${value}\nVITALS: HR=${components.hr}, RR=${components.rr}, BP=${components.sbp}\nRISK: ${riskLevel}\nMODE: OFFLINE/LOCAL`,
+      actions,
+      diagnostics,
+      education,
+      documentation: `LOCAL AI SYNTHESIS ${new Date().toLocaleString().toUpperCase()}
+
+
+SCORE
+    ${scoreType} EQUALS ${value}
+
+
+VITALS
+    HR ${components.hr} RR ${components.rr} BP ${components.sbp}
+
+
+RISK
+    ${riskLevel.toUpperCase()}
+
+
+MODE
+    OFFLINE LOCAL`,
       riskLevel
     };
   }
