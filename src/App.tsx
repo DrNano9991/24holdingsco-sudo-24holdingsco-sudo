@@ -11,9 +11,10 @@ import { ScoringEngine } from './services/scoringEngine';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import ScoreSummaryPanel from './components/ScoreSummaryPanel';
 import { AgeGroup, PEWSState } from './types';
-import { Save, FolderOpen, Trash2, UserPlus, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Save, FolderOpen, Trash2, UserPlus, CheckCircle2, AlertTriangle, CheckSquare, Check, Plus } from 'lucide-react';
 import { useTranslation } from './contexts/TranslationContext';
 import { logger } from './services/logger';
+import { toast, Toaster } from 'react-hot-toast';
 
 import ReactMarkdown from 'react-markdown';
 import Screensaver from './components/Screensaver';
@@ -183,6 +184,10 @@ const App: React.FC = () => {
   const [wellsPE, setWellsPERaw] = useLocalStorage('ai-medica-wells-pe', { dvtSymptoms: false, peLikely: false, hr100: false, immobilization: false, priorDvtPe: false, hemoptysis: false, malignancy: false });
   const [chads, setChadsRaw] = useLocalStorage('ai-medica-chads', { chf: false, htn: false, age75: false, dm: false, stroke: false, vascular: false, age65: false, female: false });
   const [pews, setPewsRaw] = useLocalStorage<PEWSState>('ai-medica-pews', { behavior: 0, cardiovascular: 0, respiratory: 0, nebulizer: false, persistentVomiting: false });
+  const [phq9, setPhq9Raw] = useLocalStorage('ai-medica-phq9', { q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0, q8: 0, q9: 0 });
+  const [gad7, setGad7Raw] = useLocalStorage('ai-medica-gad7', { q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0 });
+  const [amts, setAmtsRaw] = useLocalStorage('ai-medica-amts', { age: true, time: true, address: true, year: true, place: true, recognition: true, dob: true, monarch: true, ww2: true, countBackwards: true });
+  const [tasks, setTasksRaw] = useLocalStorage<Task[]>('ai-medica-tasks', []);
   const [machineData, setMachineDataRaw] = useLocalStorage<MachineData[]>('ai-medica-machine-data', []);
   const [ageGroup, setAgeGroupRaw] = useLocalStorage<AgeGroup>('ai-medica-age-group', 'Adult');
   const [anthro, setAnthroRaw] = useLocalStorage<{ waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; }>('ai-medica-anthro', { waist: '', height: '', hip: '', weight: '' });
@@ -200,16 +205,19 @@ const App: React.FC = () => {
   const setWellsPE = (val: any) => { setWellsPERaw(val); logGuestAction('Updated Wells PE parameters'); };
   const setChads = (val: any) => { setChadsRaw(val); logGuestAction('Updated CHADS-VASc parameters'); };
   const setPews = (val: any) => { setPewsRaw(val); logGuestAction('Updated PEWS parameters'); };
+  const setPhq9 = (val: any) => { setPhq9Raw(val); logGuestAction('Updated PHQ-9 parameters'); };
+  const setGad7 = (val: any) => { setGad7Raw(val); logGuestAction('Updated GAD-7 parameters'); };
+  const setAmts = (val: any) => { setAmtsRaw(val); logGuestAction('Updated AMTS parameters'); };
+  const setTasks = (val: Task[]) => { setTasksRaw(val); logGuestAction('Updated tasks'); };
   const setMachineData = (val: any) => { setMachineDataRaw(val); }; // Logged in onAddData
   const setAgeGroup = (val: any) => { setAgeGroupRaw(val); logGuestAction(`Changed age group to ${val}`); };
   const setAnthro = (val: any) => { setAnthroRaw(val); logGuestAction('Updated Anthropometrics'); };
   const setNotes = (val: any) => { setNotesRaw(val); logGuestAction('Modified clinical notes'); };
 
   // --- SAVED PATIENTS ---
-  const [savedPatients, setSavedPatients] = useLocalStorage<SavedPatient[]>('ai-medica-saved-patients', []);
-  const [tasks, setTasks] = useLocalStorage<Task[]>('ai-medica-tasks', []);
-  const [patientName, setPatientName] = useState('');
-  const [showSaveModal, setShowSaveModal] = useState(false);
+    const [savedPatients, setSavedPatients] = useLocalStorage<SavedPatient[]>('ai-medica-saved-patients', []);
+    const [patientName, setPatientName] = useState('');
+    const [showSaveModal, setShowSaveModal] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
@@ -312,12 +320,16 @@ const App: React.FC = () => {
       liver,
       anthro,
       surgery,
-      machineData
+      machineData,
+      phq9,
+      gad7,
+      amts
     };
     
     try {
       const result = await clinicalAI.synthesize(primaryType, primaryValue, components, patientContext, synthesisOptions);
       setAiInsight(result);
+      toast.success(t('synthesisComplete'));
       
       logGuestAction(`Performed clinical synthesis for ${primaryType} score of ${primaryValue}`);
       
@@ -342,6 +354,37 @@ const App: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const addTaskFromInsight = (text: string) => {
+    if (!text || !text.trim()) return;
+    
+    // Split by bullet points, numbers, or double line breaks
+    const lines = text.split(/\n\n|\n(?=[•\-\d\.\*])|(?<=\.)\s*\n/).filter(l => l.trim().length > 3);
+    
+    const newTasks: Task[] = lines.map(line => ({
+      id: Math.random().toString(36).substr(2, 9),
+      text: line.replace(/^[•\-\d\.\*\s]+/, '').trim(),
+      completed: false,
+      priority: 'medium' as const,
+      createdAt: new Date().toISOString()
+    })).filter(t => t.text.length > 0);
+
+    if (newTasks.length > 0) {
+      setTasks([...tasks, ...newTasks]);
+      toast.success(`${newTasks.length} ${t('tasksAdded')}`);
+      logGuestAction(`Added ${newTasks.length} tasks from AI insight`);
+    }
+  };
+
+  const toggleTask = (id: string) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : undefined } : t));
+    logGuestAction('Toggled task completion');
+  };
+
+  const deleteTask = (id: string) => {
+    setTasks(tasks.filter(t => t.id !== id));
+    logGuestAction('Deleted task');
   };
 
   const savePatient = () => {
@@ -406,6 +449,7 @@ const App: React.FC = () => {
 
     setSavedPatients([newPatient, ...savedPatients]);
     setTasks([...newTasks, ...tasks]);
+    toast.success(t('patientSaved'));
     setPatientName('');
     setShowSaveModal(false);
     setShowSaveConfirm(false);
@@ -553,6 +597,9 @@ const App: React.FC = () => {
               sirs={sirs} setSirs={setSirs}
               qsofa={qsofa} setQsofa={setQsofa}
               pews={pews} setPews={setPews}
+              phq9={phq9} setPhq9={setPhq9}
+              gad7={gad7} setGad7={setGad7}
+              amts={amts} setAmts={setAmts}
               surgery={surgery} setSurgery={setSurgery}
               activeCalculator={activeCalculator}
             />
@@ -635,7 +682,8 @@ const App: React.FC = () => {
           <Suspense fallback={<LoadingFallback />}>
             <PrescriptionCalculator 
               patientData={{
-                gcs, sirs, qsofa, mews, liver, exam, surgery, curb65, chads, pews, ageGroup, notes, anthro, machineData
+                gcs, sirs, qsofa, mews, liver, exam, surgery, curb65, chads, pews, ageGroup, notes, anthro, machineData,
+                phq9, gad7, amts
               }}
               ageGroup={ageGroup}
             />
@@ -696,7 +744,61 @@ const App: React.FC = () => {
             </div>
           </div>
         );
-      case 'tasks': return <TaskList />;
+      case 'tasks':
+        return (
+          <div className="space-y-6 transition-none animate-slide-in">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 uppercase tracking-tight">
+                <CheckSquare className="text-primary" /> {t('clinicalTasks')}
+              </h2>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {tasks.filter(t => t.completed).length}/{tasks.length} {t('completed')}
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              {tasks.map(task => (
+                <div key={task.id} className={`p-4 border-2 transition-none flex items-start gap-4 ${task.completed ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-800 shadow-[4px_4px_0px_0px_rgba(30,41,59,1)]'}`}>
+                  <button 
+                    onClick={() => toggleTask(task.id)}
+                    className={`mt-1 w-5 h-5 border-2 flex items-center justify-center transition-none ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-800 hover:bg-slate-50'}`}
+                  >
+                    {task.completed && <Check size={14} />}
+                  </button>
+                  <div className="flex-1">
+                    <p className={`text-xs font-bold uppercase tracking-tight leading-relaxed ${task.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                      {task.text}
+                    </p>
+                    <div className="mt-2 flex items-center gap-3">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                        {new Date(task.createdAt).toLocaleString()}
+                      </span>
+                      {task.completedAt && (
+                        <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">
+                          {t('completedAt')}: {new Date(task.completedAt).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => deleteTask(task.id)}
+                    className="p-1.5 text-slate-400 hover:text-red-600 transition-none"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              
+              {tasks.length === 0 && (
+                <div className="py-20 text-center bg-slate-50 border-2 border-dashed border-slate-200">
+                  <CheckSquare size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t('noTasks')}</p>
+                  <p className="text-[8px] text-slate-300 uppercase tracking-widest mt-1">{t('tasksHint')}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
       case 'diagnostics':
         return (
           <Suspense fallback={<LoadingFallback />}>
@@ -819,27 +921,51 @@ Diagnostics: ${aiInsight.diagnostics}
                       <div className="clinical-text text-slate-700 whitespace-pre-wrap leading-relaxed text-xs flex-1 overflow-y-auto custom-scrollbar">
                           {consultTab === 'summary' && (
                             <div className="p-4 bg-slate-50 border border-border max-w-none">
-                              <div className="whitespace-pre-wrap font-medium text-slate-800">{aiInsight.summary}</div>
+                              <div className="prose prose-slate prose-xs max-w-none text-slate-800">
+                                <ReactMarkdown>{aiInsight.summary}</ReactMarkdown>
+                              </div>
                             </div>
                           )}
-                         {consultTab === 'actions' && (
-                           <div className="p-4 bg-white border border-border">
-                             <div className="whitespace-pre-wrap font-medium text-slate-800">{aiInsight.actions}</div>
-                             {!aiInsight.actions && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noActions')}</p>}
-                           </div>
-                         )}
-                         {consultTab === 'diagnostics' && (
-                           <div className="p-4 bg-white border border-border">
-                             <div className="whitespace-pre-wrap font-medium text-slate-800">{aiInsight.diagnostics}</div>
-                             {!aiInsight.diagnostics && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noDiagnostics')}</p>}
-                           </div>
-                         )}
-                         {consultTab === 'education' && (
-                           <div className="p-4 bg-white border border-border">
-                             <div className="whitespace-pre-wrap font-medium text-slate-800">{aiInsight.education}</div>
-                             {!aiInsight.education && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noEducation')}</p>}
-                           </div>
-                         )}
+                          {consultTab === 'actions' && (
+                            <div className="p-4 bg-white border border-border">
+                              <div className="flex justify-end mb-2">
+                                <button 
+                                  onClick={() => addTaskFromInsight(aiInsight.actions)}
+                                  className="px-2 py-1 bg-slate-800 text-white text-[8px] font-bold uppercase tracking-widest border border-slate-800 hover:bg-slate-700 transition-none flex items-center gap-1"
+                                >
+                                  <Plus size={10} /> {t('addToTasks')}
+                                </button>
+                              </div>
+                              <div className="prose prose-slate prose-xs max-w-none text-slate-800">
+                                <ReactMarkdown>{aiInsight.actions}</ReactMarkdown>
+                              </div>
+                              {!aiInsight.actions && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noActions')}</p>}
+                            </div>
+                          )}
+                          {consultTab === 'diagnostics' && (
+                            <div className="p-4 bg-white border border-border">
+                              <div className="flex justify-end mb-2">
+                                <button 
+                                  onClick={() => addTaskFromInsight(aiInsight.diagnostics)}
+                                  className="px-2 py-1 bg-slate-800 text-white text-[8px] font-bold uppercase tracking-widest border border-slate-800 hover:bg-slate-700 transition-none flex items-center gap-1"
+                                >
+                                  <Plus size={10} /> {t('addToTasks')}
+                                </button>
+                              </div>
+                              <div className="prose prose-slate prose-xs max-w-none text-slate-800">
+                                <ReactMarkdown>{aiInsight.diagnostics}</ReactMarkdown>
+                              </div>
+                              {!aiInsight.diagnostics && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noDiagnostics')}</p>}
+                            </div>
+                          )}
+                          {consultTab === 'education' && (
+                            <div className="p-4 bg-white border border-border">
+                              <div className="prose prose-slate prose-xs max-w-none text-slate-800">
+                                <ReactMarkdown>{aiInsight.education}</ReactMarkdown>
+                              </div>
+                              {!aiInsight.education && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noEducation')}</p>}
+                            </div>
+                          )}
                          {consultTab === 'documentation' && (
                            <div className="p-4 bg-slate-800 text-slate-100 font-mono text-[10px] border border-slate-700 leading-relaxed">
                              {aiInsight.documentation}
@@ -1154,7 +1280,6 @@ Diagnostics: ${aiInsight.diagnostics}
               <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
                 {[
                   ...BOTTOM_NAV_SECTIONS, 
-                  { id: 'prescription', name: 'Prescription', icon: <Pill size={14} className="text-emerald-500" /> },
                   { id: 'patients', name: t('records'), icon: <FolderOpen size={14} className="text-blue-400" /> }
                 ].map((s) => (
                   <button 
@@ -1260,6 +1385,7 @@ Diagnostics: ${aiInsight.diagnostics}
         </div>
       </main>
 
+      <Toaster position="top-right" />
     </div>
   );
 };

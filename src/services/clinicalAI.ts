@@ -147,6 +147,7 @@ MONITORING PLAN
         - Liver Findings: ${JSON.stringify(patientData.liver || {})}
         - Anthropometry: ${JSON.stringify(patientData.anthro || {})}
         - Surgical Context: ${JSON.stringify(patientData.surgery || {})}
+        - Mental Health: PHQ-9=${JSON.stringify(patientData.phq9 || {})}, GAD-7=${JSON.stringify(patientData.gad7 || {})}, AMTS=${JSON.stringify(patientData.amts || {})}
         - Machine Data (Labs/Imaging): ${JSON.stringify(patientData.machineData || [])}
         
         PRIMARY SCORING DATA:
@@ -171,6 +172,7 @@ MONITORING PLAN
            - If depth is 'detailed', provide a comprehensive physiological rationale.
            - Focus primarily on ${options.focus} aspects.
         2. List immediate life-saving or stabilizing actions if necessary.
+           - CRITICAL: If riskLevel is 'High' or 'Critical', provide SPECIFIC, URGENT, and ACTIONABLE recommendations (e.g., specific drug doses, immediate surgical consult, rapid response activation).
         3. Recommend a targeted diagnostic workup (Labs, Imaging, Monitoring).
         4. Provide evidence-based education points for the patient or their family.
         5. Generate a professional, structured medical note (SBAR or SOAP format) suitable for a hospital handover if requested.
@@ -774,6 +776,145 @@ RECOMMENDATIONS
 
 RECOMMENDATIONS
     CONTINUE ROUTINE POST OPERATIVE CARE
+
+
+`;
+        }
+        break;
+
+      case 'PHQ-9':
+        if (value >= 15) {
+          riskLevel = 'High';
+          summary += `CLINICAL IMPRESSION
+    A PHQ 9 SCORE OF ${value} INDICATES MODERATELY SEVERE TO SEVERE DEPRESSION
+
+
+RECOMMENDATIONS
+    IMMEDIATE CLINICAL EVALUATION FOR SAFETY AND TREATMENT PLANNING IS REQUIRED
+
+
+`;
+          actions += `MENTAL HEALTH ACTIONS
+    URGENT PSYCHIATRIC CONSULTATION
+    ASSESS FOR SUICIDAL IDEATION OR SELF HARM RISK
+    CONSIDER INITIATING ANTIDEPRESSANT THERAPY
+    REFER FOR INTENSIVE PSYCHOTHERAPY
+
+
+`;
+        } else if (value >= 10) {
+          riskLevel = 'Moderate';
+          summary += `CLINICAL IMPRESSION
+    A PHQ 9 SCORE OF ${value} INDICATES MODERATE DEPRESSION
+
+
+RECOMMENDATIONS
+    CLINICAL JUDGMENT SHOULD GUIDE TREATMENT DECISIONS INCLUDING THERAPY OR MEDICATION
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    MONITOR SYMPTOMS CLOSELY
+    CONSIDER COUNSELING OR PSYCHOTHERAPY
+    REVIEW TREATMENT PLAN IN 2 TO 4 WEEKS
+
+
+`;
+        } else {
+          summary += `CLINICAL IMPRESSION
+    A PHQ 9 SCORE OF ${value} INDICATES MINIMAL TO MILD DEPRESSIVE SYMPTOMS
+
+
+RECOMMENDATIONS
+    CONTINUE MONITORING AS CLINICALLY INDICATED
+
+
+`;
+        }
+        break;
+
+      case 'GAD-7':
+        if (value >= 15) {
+          riskLevel = 'High';
+          summary += `CLINICAL IMPRESSION
+    A GAD 7 SCORE OF ${value} INDICATES SEVERE ANXIETY
+
+
+RECOMMENDATIONS
+    ACTIVE TREATMENT AND CLOSE FOLLOW UP ARE RECOMMENDED
+
+
+`;
+          actions += `ANXIETY ACTIONS
+    CONSIDER PHARMACOTHERAPY SSRI OR SNRI
+    REFER FOR COGNITIVE BEHAVIORAL THERAPY CBT
+    ASSESS FOR CO MORBID DEPRESSION
+
+
+`;
+        } else if (value >= 10) {
+          riskLevel = 'Moderate';
+          summary += `CLINICAL IMPRESSION
+    A GAD 7 SCORE OF ${value} INDICATES MODERATE ANXIETY
+
+
+RECOMMENDATIONS
+    FURTHER EVALUATION AND POSSIBLE TREATMENT ARE WARRANTED
+
+
+`;
+          actions += `REQUIRED ACTIONS
+    CONSIDER COUNSELING
+    MONITOR FOR SYMPTOM PROGRESSION
+
+
+`;
+        } else {
+          summary += `CLINICAL IMPRESSION
+    A GAD 7 SCORE OF ${value} INDICATES MINIMAL TO MILD ANXIETY
+
+
+RECOMMENDATIONS
+    REASSURANCE AND MONITORING
+
+
+`;
+        }
+        break;
+
+      case 'AMTS':
+        if (value < 7) {
+          riskLevel = 'High';
+          summary += `CLINICAL IMPRESSION
+    AN ABBREVIATED MENTAL TEST SCORE AMTS OF ${value} OUT OF 10 SUGGESTS COGNITIVE IMPAIRMENT
+
+
+RECOMMENDATIONS
+    FURTHER INVESTIGATION FOR DELIRIUM OR DEMENTIA IS REQUIRED
+
+
+`;
+          actions += `COGNITIVE ACTIONS
+    SCREEN FOR REVERSIBLE CAUSES OF CONFUSION INFECTION DEHYDRATION MEDICATION SIDE EFFECTS
+    CONSIDER FORMAL COGNITIVE ASSESSMENT MMSE OR MOCA
+    NOTIFY FAMILY AND ENSURE PATIENT SAFETY
+
+
+`;
+          diagnostics += `DIAGNOSTIC WORKUP
+    SCREEN FOR UTI AND OTHER INFECTIONS
+    REVIEW RECENT MEDICATION CHANGES
+    CHECK ELECTROLYTES AND B12 LEVELS
+
+
+`;
+        } else {
+          summary += `CLINICAL IMPRESSION
+    AN AMTS OF ${value} OUT OF 10 IS WITHIN THE NORMAL RANGE
+
+
+RECOMMENDATIONS
+    NO IMMEDIATE COGNITIVE CONCERNS IDENTIFIED
 
 
 `;

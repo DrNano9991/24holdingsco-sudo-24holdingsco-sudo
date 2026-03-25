@@ -175,4 +175,27 @@ export class ScoringEngine {
     
     return score;
   }
+
+  static calculatePHQ9(state: any): number {
+    const values = Object.values(state);
+    let total = 0;
+    for (const val of values) {
+      total += Number(val) || 0;
+    }
+    return total;
+  }
+
+  static calculateGAD7(state: any): number {
+    const values = Object.values(state);
+    let total = 0;
+    for (const val of values) {
+      total += Number(val) || 0;
+    }
+    return total;
+  }
+
+  static calculateAMTS(state: any): number {
+    const values = Object.values(state);
+    return values.filter(Boolean).length;
+  }
 }

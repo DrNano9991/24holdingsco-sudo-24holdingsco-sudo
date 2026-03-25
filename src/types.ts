@@ -117,6 +117,41 @@ export interface MachineData {
   deviceName?: string;
 }
 
+export interface PHQ9State {
+  q1: number; // 0-3
+  q2: number;
+  q3: number;
+  q4: number;
+  q5: number;
+  q6: number;
+  q7: number;
+  q8: number;
+  q9: number;
+}
+
+export interface GAD7State {
+  q1: number; // 0-3
+  q2: number;
+  q3: number;
+  q4: number;
+  q5: number;
+  q6: number;
+  q7: number;
+}
+
+export interface AMTSState {
+  age: boolean;
+  time: boolean;
+  address: boolean;
+  year: boolean;
+  place: boolean;
+  recognition: boolean;
+  dob: boolean;
+  monarch: boolean; // or president
+  ww2: boolean;
+  countBackwards: boolean;
+}
+
 export interface PatientData {
   gcs: GCSState;
   sirs: SIRSState;
@@ -128,6 +163,9 @@ export interface PatientData {
   curb65: CURB65State;
   chads: CHADS2VAScState;
   pews: PEWSState;
+  phq9: PHQ9State;
+  gad7: GAD7State;
+  amts: AMTSState;
   ageGroup: AgeGroup;
   notes: string;
   anthro?: { waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; };

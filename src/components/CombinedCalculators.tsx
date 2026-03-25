@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { GCSState, MEWSState, SIRSState, QSOFAState, PEWSState, AgeGroup, ExamState, SurgicalState } from '../types';
+import { GCSState, MEWSState, SIRSState, QSOFAState, PEWSState, AgeGroup, ExamState, SurgicalState, PHQ9State, GAD7State, AMTSState } from '../types';
 import { GCS_OPTIONS } from '../constants';
 import ScoreCard from './ScoreCard';
 import Tooltip from './Tooltip';
@@ -21,13 +21,21 @@ interface Props {
   setQsofa: (val: QSOFAState) => void;
   pews: PEWSState;
   setPews: (val: PEWSState) => void;
+  phq9: PHQ9State;
+  setPhq9: (val: PHQ9State) => void;
+  gad7: GAD7State;
+  setGad7: (val: GAD7State) => void;
+  amts: AMTSState;
+  setAmts: (val: AMTSState) => void;
   surgery: SurgicalState;
   setSurgery: (val: SurgicalState) => void;
   activeCalculator?: string;
 }
 
 const CombinedCalculators: React.FC<Props> = ({ 
-  ageGroup, gcs, setGcs, mews, setMews, sirs, setSirs, qsofa, setQsofa, pews, setPews, surgery, setSurgery,
+  ageGroup, gcs, setGcs, mews, setMews, sirs, setSirs, qsofa, setQsofa, pews, setPews, 
+  phq9, setPhq9, gad7, setGad7, amts, setAmts,
+  surgery, setSurgery,
   activeCalculator 
 }) => {
   const { t } = useTranslation();
@@ -523,6 +531,152 @@ const CombinedCalculators: React.FC<Props> = ({
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        );
+      case 'PHQ-9':
+        return (
+          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-800">
+                  <Brain className="text-white" size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">PHQ-9</h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Depression Severity</p>
+                </div>
+              </div>
+              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculatePHQ9(phq9)}</div>
+            </div>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {[
+                'Little interest or pleasure in doing things',
+                'Feeling down, depressed, or hopeless',
+                'Trouble falling or staying asleep, or sleeping too much',
+                'Feeling tired or having little energy',
+                'Poor appetite or overeating',
+                'Feeling bad about yourself — or that you are a failure or have let yourself or your family down',
+                'Trouble concentrating on things, such as reading the newspaper or watching television',
+                'Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual',
+                'Thoughts that you would be better off dead or of hurting yourself in some way'
+              ].map((q, i) => (
+                <div key={i} className="p-3 bg-slate-50 border-2 border-slate-200">
+                  <p className="text-[11px] font-black text-slate-700 uppercase mb-2">{i + 1}. {q}</p>
+                  <div className="grid grid-cols-4 gap-1">
+                    {['Not at all', 'Several days', 'More than half', 'Nearly every day'].map((label, val) => (
+                      <button
+                        key={val}
+                        onClick={() => setPhq9({...phq9, [`q${i+1}`]: val})}
+                        className={`p-1 border-2 text-[8px] font-black uppercase transition-none ${
+                          phq9[`q${i+1}` as keyof PHQ9State] === val
+                            ? 'bg-slate-800 text-white border-slate-800'
+                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'GAD-7':
+        return (
+          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-800">
+                  <Brain className="text-white" size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">GAD-7</h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Anxiety Severity</p>
+                </div>
+              </div>
+              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculateGAD7(gad7)}</div>
+            </div>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {[
+                'Feeling nervous, anxious or on edge',
+                'Not being able to stop or control worrying',
+                'Worrying too much about different things',
+                'Trouble relaxing',
+                'Being so restless that it is hard to sit still',
+                'Becoming easily annoyed or irritable',
+                'Feeling afraid as if something awful might happen'
+              ].map((q, i) => (
+                <div key={i} className="p-3 bg-slate-50 border-2 border-slate-200">
+                  <p className="text-[11px] font-black text-slate-700 uppercase mb-2">{i + 1}. {q}</p>
+                  <div className="grid grid-cols-4 gap-1">
+                    {['Not at all', 'Several days', 'More than half', 'Nearly every day'].map((label, val) => (
+                      <button
+                        key={val}
+                        onClick={() => setGad7({...gad7, [`q${i+1}`]: val})}
+                        className={`p-1 border-2 text-[8px] font-black uppercase transition-none ${
+                          gad7[`q${i+1}` as keyof GAD7State] === val
+                            ? 'bg-slate-800 text-white border-slate-800'
+                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'AMTS':
+        return (
+          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-800">
+                  <Brain className="text-white" size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">AMTS</h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cognitive Screen</p>
+                </div>
+              </div>
+              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculateAMTS(amts)}</div>
+            </div>
+            <div className="space-y-2">
+              {[
+                { label: 'Age', key: 'age' },
+                { label: 'Time (nearest hour)', key: 'time' },
+                { label: 'Address (recall at end)', key: 'address' },
+                { label: 'Year', key: 'year' },
+                { label: 'Place (name of hospital/building)', key: 'place' },
+                { label: 'Recognition of two persons', key: 'recognition' },
+                { label: 'Date of Birth', key: 'dob' },
+                { label: 'Monarch / President', key: 'monarch' },
+                { label: 'Dates of WW2', key: 'ww2' },
+                { label: 'Count backwards 20 to 1', key: 'countBackwards' }
+              ].map((item) => (
+                <div key={item.key} className="flex items-center justify-between p-3 bg-slate-50 border-2 border-slate-200">
+                  <span className="font-black text-slate-800 text-[11px] uppercase tracking-tight">{item.label}</span>
+                  <div className="flex gap-1">
+                    {[false, true].map((val) => (
+                      <button
+                        key={val ? 'yes' : 'no'}
+                        onClick={() => setAmts({...amts, [item.key as keyof AMTSState]: val})}
+                        className={`px-3 py-1 border-2 text-[10px] font-black uppercase transition-none ${
+                          amts[item.key as keyof AMTSState] === val
+                            ? 'bg-slate-800 text-white border-slate-800'
+                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                        }`}
+                      >
+                        {val ? 'Correct' : 'Incorrect'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         );
