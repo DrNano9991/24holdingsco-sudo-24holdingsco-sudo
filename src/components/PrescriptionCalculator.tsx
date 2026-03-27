@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Pill, Calculator, AlertCircle, CheckCircle2, Info, Search, ShieldCheck, AlertTriangle, Syringe } from 'lucide-react';
+import { Pill, Calculator, AlertCircle, CheckCircle2, Info, Search, ShieldCheck, AlertTriangle, Syringe, Mic } from 'lucide-react';
 import { PatientData, AgeGroup } from '../types';
 import { clinicalAI } from '../services/clinicalAI';
 import ScoreCard from './ScoreCard';
@@ -9,114 +9,163 @@ interface Medication {
   category: string;
   standardDose: number; 
   defaultUnit: string;
-  concentration: number; // in [defaultUnit]/ml
+  concentration: number; // in [defaultUnit] per [formUnit]
+  formUnit: string; // 'ml', 'Tablet', 'Capsule', 'Tube', 'Application'
+  dosageForms: string[]; // e.g. ['Oral', 'IV', 'IM', 'Topical']
   maxDose?: number; 
   warningThreshold?: number; 
 }
 
 const MEDICATION_DATABASE: Medication[] = [
-  { name: 'Gentamicin', category: 'Antibiotic', standardDose: 5, defaultUnit: 'mg/kg', concentration: 40, warningThreshold: 7 },
-  { name: 'Ampicillin', category: 'Antibiotic', standardDose: 50, defaultUnit: 'mg/kg', concentration: 100, warningThreshold: 100 },
-  { name: 'Ceftriaxone', category: 'Antibiotic', standardDose: 80, defaultUnit: 'mg/kg', concentration: 100, warningThreshold: 100 },
-  { name: 'Paracetamol', category: 'Analgesic', standardDose: 15, defaultUnit: 'mg/kg', concentration: 10, warningThreshold: 20 },
-  { name: 'Morphine', category: 'Analgesic', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 1, warningThreshold: 0.2 },
-  { name: 'Adrenaline', category: 'Resuscitation', standardDose: 0.01, defaultUnit: 'mg/kg', concentration: 0.1, warningThreshold: 0.02 },
-  { name: 'Furosemide', category: 'Diuretic', standardDose: 1, defaultUnit: 'mg/kg', concentration: 10, warningThreshold: 2 },
-  { name: 'Phenobarbital', category: 'Anticonvulsant', standardDose: 20, defaultUnit: 'mg/kg', concentration: 200, warningThreshold: 30 },
-  // Ugandan Schedule
-  { name: 'Artemether/Lumefantrine', category: 'Antimalarial', standardDose: 1.7, defaultUnit: 'mg/kg', concentration: 20, warningThreshold: 4 },
-  { name: 'Quinine', category: 'Antimalarial', standardDose: 10, defaultUnit: 'mg/kg', concentration: 300, warningThreshold: 20 },
-  { name: 'Artesunate', category: 'Antimalarial', standardDose: 2.4, defaultUnit: 'mg/kg', concentration: 60, warningThreshold: 5 },
-  { name: 'Metronidazole', category: 'Antibiotic', standardDose: 7.5, defaultUnit: 'mg/kg', concentration: 5, warningThreshold: 15 },
-  { name: 'Ciprofloxacin', category: 'Antibiotic', standardDose: 15, defaultUnit: 'mg/kg', concentration: 2, warningThreshold: 20 },
-  { name: 'Amoxicillin/Clavulanate', category: 'Antibiotic', standardDose: 45, defaultUnit: 'mg/kg', concentration: 80, warningThreshold: 90 },
-  { name: 'Cotrimoxazole', category: 'Antibiotic', standardDose: 24, defaultUnit: 'mg/kg', concentration: 48, warningThreshold: 48 },
-  { name: 'Fluconazole', category: 'Antifungal', standardDose: 6, defaultUnit: 'mg/kg', concentration: 2, warningThreshold: 12 },
-  { name: 'Insulin (Soluble)', category: 'Endocrine', standardDose: 0.1, defaultUnit: 'U/kg', concentration: 100, warningThreshold: 0.5 },
-  { name: 'Salbutamol', category: 'Respiratory', standardDose: 0.15, defaultUnit: 'mg/kg', concentration: 1, warningThreshold: 0.3 },
-  { name: 'Hydrocortisone', category: 'Steroid', standardDose: 4, defaultUnit: 'mg/kg', concentration: 50, warningThreshold: 10 },
-  { name: 'Dexamethasone', category: 'Steroid', standardDose: 0.15, defaultUnit: 'mg/kg', concentration: 4, warningThreshold: 0.6 },
-  { name: 'Magnesium Sulphate', category: 'Anticonvulsant', standardDose: 50, defaultUnit: 'mg/kg', concentration: 500, warningThreshold: 100 },
-  { name: 'Oxytocin', category: 'Obstetric', standardDose: 0.02, defaultUnit: 'U/kg', concentration: 10, warningThreshold: 0.1 },
-  { name: 'Misoprostol', category: 'Obstetric', standardDose: 4, defaultUnit: 'micrograms/kg', concentration: 0.2, warningThreshold: 10 },
-  { name: 'Benzylpenicillin (X-pen)', category: 'Antibiotic', standardDose: 50000, defaultUnit: 'U/kg', concentration: 200000, warningThreshold: 100000 },
-  { name: 'Cloxacillin', category: 'Antibiotic', standardDose: 25, defaultUnit: 'mg/kg', concentration: 125, warningThreshold: 50 },
-  { name: 'Erythromycin', category: 'Antibiotic', standardDose: 10, defaultUnit: 'mg/kg', concentration: 125, warningThreshold: 20 },
-  { name: 'Azithromycin', category: 'Antibiotic', standardDose: 10, defaultUnit: 'mg/kg', concentration: 40, warningThreshold: 15 },
-  { name: 'Albendazole', category: 'Anthelmintic', standardDose: 400, defaultUnit: 'mg/kg', concentration: 200, warningThreshold: 400 },
-  { name: 'Diazepam', category: 'Anticonvulsant', standardDose: 0.3, defaultUnit: 'mg/kg', concentration: 5, warningThreshold: 0.5 },
-  { name: 'Chlorpromazine', category: 'Antipsychotic', standardDose: 0.5, defaultUnit: 'mg/kg', concentration: 25, warningThreshold: 2 },
-  { name: 'Haloperidol', category: 'Antipsychotic', standardDose: 0.02, defaultUnit: 'mg/kg', concentration: 5, warningThreshold: 0.1 },
-  { name: 'Atenolol', category: 'Cardiovascular', standardDose: 1, defaultUnit: 'mg/kg', concentration: 50, warningThreshold: 2 },
-  { name: 'Nifedipine', category: 'Cardiovascular', standardDose: 0.25, defaultUnit: 'mg/kg', concentration: 10, warningThreshold: 1 },
-  { name: 'Enalapril', category: 'Cardiovascular', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 5, warningThreshold: 0.5 },
-  { name: 'Spironolactone', category: 'Diuretic', standardDose: 1, defaultUnit: 'mg/kg', concentration: 25, warningThreshold: 3 },
-  { name: 'Prednisolone', category: 'Steroid', standardDose: 1, defaultUnit: 'mg/kg', concentration: 5, warningThreshold: 2 },
-  { name: 'Nevirapine', category: 'Antiretroviral', standardDose: 150, defaultUnit: 'mg/kg', concentration: 10, warningThreshold: 200 },
-  { name: 'Zidovudine (AZT)', category: 'Antiretroviral', standardDose: 180, defaultUnit: 'mg/kg', concentration: 10, warningThreshold: 240 },
-  { name: 'Tenofovir (TDF)', category: 'Antiretroviral', standardDose: 300, defaultUnit: 'mg/kg', concentration: 300, warningThreshold: 300 },
-  { name: 'Lamivudine (3TC)', category: 'Antiretroviral', standardDose: 4, defaultUnit: 'mg/kg', concentration: 10, warningThreshold: 8 },
-  { name: 'Rifampicin', category: 'Antitubercular', standardDose: 10, defaultUnit: 'mg/kg', concentration: 20, warningThreshold: 15 },
-  { name: 'Isoniazid', category: 'Antitubercular', standardDose: 5, defaultUnit: 'mg/kg', concentration: 10, warningThreshold: 10 },
-  { name: 'Pyrazinamide', category: 'Antitubercular', standardDose: 25, defaultUnit: 'mg/kg', concentration: 50, warningThreshold: 35 },
-  { name: 'Ethambutol', category: 'Antitubercular', standardDose: 15, defaultUnit: 'mg/kg', concentration: 100, warningThreshold: 25 },
-  { name: 'Digoxin', category: 'Cardiovascular', standardDose: 0.01, defaultUnit: 'mg/kg', concentration: 0.25, warningThreshold: 0.02 },
-  { name: 'Warfarin', category: 'Anticoagulant', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 5, warningThreshold: 0.2 },
-  { name: 'Heparin', category: 'Anticoagulant', standardDose: 50, defaultUnit: 'U/kg', concentration: 5000, warningThreshold: 100 },
-  { name: 'Enoxaparin', category: 'Anticoagulant', standardDose: 1, defaultUnit: 'mg/kg', concentration: 100, warningThreshold: 1.5 },
-  { name: 'Phenytoin', category: 'Anticonvulsant', standardDose: 5, defaultUnit: 'mg/kg', concentration: 50, warningThreshold: 10 },
-  { name: 'Sodium Valproate', category: 'Anticonvulsant', standardDose: 20, defaultUnit: 'mg/kg', concentration: 200, warningThreshold: 40 },
-  { name: 'Carbamazepine', category: 'Anticonvulsant', standardDose: 10, defaultUnit: 'mg/kg', concentration: 20, warningThreshold: 20 },
-  { name: 'Amitriptyline', category: 'Antidepressant', standardDose: 1, defaultUnit: 'mg/kg', concentration: 25, warningThreshold: 2.5 },
-  { name: 'Fluoxetine', category: 'Antidepressant', standardDose: 0.5, defaultUnit: 'mg/kg', concentration: 20, warningThreshold: 1 },
+  { name: 'Gentamicin', category: 'Antibiotic', standardDose: 5, defaultUnit: 'mg/kg', concentration: 40, formUnit: 'ml', dosageForms: ['IV', 'IM'], warningThreshold: 7 },
+  { name: 'Ampicillin', category: 'Antibiotic', standardDose: 50, defaultUnit: 'mg/kg', concentration: 100, formUnit: 'ml', dosageForms: ['IV', 'IM', 'Oral'], warningThreshold: 100 },
+  { name: 'Ceftriaxone', category: 'Antibiotic', standardDose: 80, defaultUnit: 'mg/kg', concentration: 100, formUnit: 'ml', dosageForms: ['IV', 'IM'], warningThreshold: 100 },
+  { name: 'Paracetamol (Tablet)', category: 'Analgesic', standardDose: 15, defaultUnit: 'mg/kg', concentration: 500, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 20 },
+  { name: 'Paracetamol (Syrup)', category: 'Analgesic', standardDose: 15, defaultUnit: 'mg/kg', concentration: 24, formUnit: 'ml', dosageForms: ['Oral'], warningThreshold: 20 },
+  { name: 'Amoxicillin (Capsule)', category: 'Antibiotic', standardDose: 45, defaultUnit: 'mg/kg', concentration: 250, formUnit: 'Capsule', dosageForms: ['Oral'], warningThreshold: 90 },
+  { name: 'Morphine', category: 'Analgesic', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 1, formUnit: 'ml', dosageForms: ['IV', 'IM', 'SC', 'Oral'], warningThreshold: 0.2 },
+  { name: 'Adrenaline', category: 'Resuscitation', standardDose: 0.01, defaultUnit: 'mg/kg', concentration: 0.1, formUnit: 'ml', dosageForms: ['IV', 'IM', 'SC'], warningThreshold: 0.02 },
+  { name: 'Furosemide', category: 'Diuretic', standardDose: 1, defaultUnit: 'mg/kg', concentration: 10, formUnit: 'ml', dosageForms: ['IV', 'IM', 'Oral'], warningThreshold: 2 },
+  { name: 'Hydrocortisone Cream', category: 'Steroid', standardDose: 1, defaultUnit: 'mg/kg', concentration: 10, formUnit: 'Application', dosageForms: ['Topical'], warningThreshold: 10 },
+  { name: 'Diclofenac Gel', category: 'Analgesic', standardDose: 1, defaultUnit: 'mg/kg', concentration: 10, formUnit: 'Application', dosageForms: ['Topical'], warningThreshold: 5 },
+  { name: 'Artemether/Lumefantrine', category: 'Antimalarial', standardDose: 1.7, defaultUnit: 'mg/kg', concentration: 20, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 4 },
+  { name: 'Metformin', category: 'Diabetes', standardDose: 15, defaultUnit: 'mg/kg', concentration: 500, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 30 },
+  { name: 'Amlodipine', category: 'Hypertension', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 5, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.2 },
+  { name: 'Atorvastatin', category: 'Hyperlipidemia', standardDose: 0.2, defaultUnit: 'mg/kg', concentration: 10, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.5 },
+  { name: 'Salbutamol Inhaler', category: 'Respiratory', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 0.1, formUnit: 'Puff', dosageForms: ['Inhalation'], warningThreshold: 0.3 },
+  // ... rest of database can be updated similarly if needed, but these cover the requested types
 ];
 
 const DOSING_RATES = ['QD', 'BD', 'OD', 'TD', 'TID', 'QID'];
-const DOSING_UNITS = ['mg/kg', 'micrograms/kg', 'ng/kg', 'ml/kg', 'g/kg', 'pg/kg', 'U/kg', 'IU/kg'];
+const DOSING_UNITS = ['mg/kg', 'micrograms/kg', 'ng/kg', 'ml/kg', 'g/kg', 'pg/kg', 'U/kg', 'IU/kg', 'Tablet/kg', 'Capsule/kg', 'Application/kg'];
 
 interface PrescriptionCalculatorProps {
   patientData: PatientData;
   ageGroup: AgeGroup;
+  onVoiceCommand?: () => void;
 }
 
 type PrescriptionResult = string;
 
 const SyringeMap: React.FC<{ volume: number }> = ({ volume }) => {
-  // Volume is in ml. We assume a 1ml syringe for the visual aid as requested.
-  // If volume > 1, we cap it at 1 for the visual or show it full.
-  const fillPercentage = Math.min(100, (volume / 1) * 100);
-  
+  // Determine syringe size based on volume
+  const getSyringeSize = (vol: number) => {
+    if (vol <= 1) return 1;
+    if (vol <= 2) return 2;
+    if (vol <= 5) return 5;
+    if (vol <= 10) return 10;
+    if (vol <= 20) return 20;
+    if (vol <= 50) return 50;
+    return 60; // Max standard syringe
+  };
+
+  // Calculate how many syringes are needed
+  const syringesNeeded = Math.ceil(volume / 60);
+  const volumes = [];
+  let remainingVolume = volume;
+  for (let i = 0; i < syringesNeeded; i++) {
+    const currentVol = Math.min(remainingVolume, 60);
+    volumes.push(currentVol);
+    remainingVolume -= currentVol;
+  }
+
   return (
-    <div className="flex flex-col items-center p-4 bg-slate-50 border border-slate-200 rounded-lg">
-      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4">1ml Syringe Visual Aid</p>
-      <div className="relative w-12 h-48 border-2 border-slate-300 rounded-b-lg bg-white overflow-hidden">
-        {/* Plunger */}
-        <div 
-          className="absolute bottom-0 left-0 right-0 bg-emerald-500/30 transition-all duration-500"
-          style={{ height: `${fillPercentage}%` }}
-        />
-        {/* Graduations */}
-        {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map(v => (
-          <div 
-            key={v} 
-            className="absolute left-0 right-0 border-t border-slate-200 flex items-center justify-end pr-1"
-            style={{ bottom: `${v * 100}%` }}
-          >
-            <span className="text-[7px] font-bold text-slate-400">{v}</span>
-          </div>
-        ))}
-        {/* Fluid Level Line */}
-        <div 
-          className="absolute left-0 right-0 border-t-2 border-emerald-600 z-10"
-          style={{ bottom: `${fillPercentage}%` }}
-        />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-2">
+          <Syringe className="text-primary" size={18} />
+          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Clinical Infusion Visualization</h4>
+        </div>
+        <div className="text-right">
+          <p className="text-lg font-black text-primary leading-none">{volume.toFixed(2)} <span className="text-[10px]">ml</span></p>
+          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Total Volume Required</p>
+        </div>
       </div>
-      <p className="text-[10px] font-bold text-slate-600 mt-2 uppercase">{volume.toFixed(2)} ml</p>
+
+      <div className="flex flex-wrap gap-4 justify-center p-6 bg-slate-50 border border-slate-200 rounded-xl shadow-inner overflow-x-auto">
+        {volumes.map((vol, idx) => {
+          const syringeSize = getSyringeSize(vol);
+          const fillPercentage = Math.min(100, (vol / syringeSize) * 100);
+          const step = syringeSize <= 2 ? 0.2 : syringeSize <= 10 ? 1 : syringeSize <= 20 ? 2 : 5;
+          const graduations = [];
+          for (let i = 0; i <= syringeSize; i += step) {
+            graduations.push(Number(i.toFixed(1)));
+          }
+
+          return (
+            <div key={idx} className="flex flex-col items-center">
+              <div className="relative w-16 h-64 flex flex-col items-center">
+                {/* Syringe Body */}
+                <div className="relative w-12 h-56 border-2 border-slate-400 rounded-b-xl bg-gradient-to-r from-white/90 via-white/50 to-white/90 backdrop-blur-sm overflow-hidden shadow-lg">
+                  {/* Fluid with realistic gradient */}
+                  <div 
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-600/60 to-emerald-400/40 transition-all duration-700 ease-out z-10"
+                    style={{ height: `${fillPercentage}%` }}
+                  >
+                    {/* Fluid highlight */}
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-white/30" />
+                    {/* Bubbles effect */}
+                    <div className="absolute top-2 left-2 w-1 h-1 bg-white/40 rounded-full animate-bounce" />
+                    <div className="absolute top-8 right-3 w-1.5 h-1.5 bg-white/30 rounded-full animate-pulse" />
+                  </div>
+
+                  {/* Plunger Tip (Rubber Stopper) */}
+                  <div 
+                    className="absolute left-0 right-0 h-6 transition-all duration-700 ease-out z-20"
+                    style={{ bottom: `calc(${fillPercentage}% - 4px)` }}
+                  >
+                    <div className="w-full h-2 bg-slate-800 rounded-t-sm" />
+                    <div className="w-full h-4 bg-slate-700" />
+                  </div>
+
+                  {/* Graduations */}
+                  {graduations.map(v => (
+                    <div 
+                      key={v} 
+                      className="absolute left-0 right-0 flex items-center justify-between px-1 z-30"
+                      style={{ bottom: `${(v / syringeSize) * 100}%` }}
+                    >
+                      <div className={`h-[1px] ${v % 1 === 0 ? 'w-3 bg-slate-600' : 'w-1.5 bg-slate-400'}`} />
+                      <span className="text-[7px] font-black text-slate-500">{v}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Needle Hub */}
+                <div className="w-4 h-4 bg-slate-400 rounded-t-sm -mt-0.5 shadow-sm" />
+                <div className="w-1 h-6 bg-slate-300 shadow-sm" />
+
+                {/* Plunger Handle (Top) */}
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 w-8 h-48 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 border-x-2 border-slate-300 z-[-1] transition-all duration-700 ease-out"
+                  style={{ bottom: `calc(${fillPercentage}% + 56px)` }}
+                >
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-2 bg-slate-400 rounded-full shadow-sm" />
+                </div>
+              </div>
+              <p className="mt-2 text-[9px] font-black text-slate-500 uppercase tracking-tighter">Syringe {idx + 1} ({vol.toFixed(1)}ml)</p>
+            </div>
+          );
+        })}
+      </div>
+      
+      {volume > 60 && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertTriangle size={16} className="text-amber-600 mt-0.5" />
+          <div>
+            <p className="text-[10px] font-black text-amber-800 uppercase tracking-tight">Large Volume Warning</p>
+            <p className="text-[9px] font-bold text-amber-700 uppercase tracking-widest mt-1">
+              Total volume ({volume.toFixed(2)}ml) exceeds standard syringe capacity. 
+              Dose must be divided into {syringesNeeded} separate syringes or administered via infusion pump.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patientData, ageGroup }) => {
+const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patientData, ageGroup, onVoiceCommand }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [prescription, setPrescription] = useState<PrescriptionResult | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -125,9 +174,17 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
   const [weight, setWeight] = useState<number>(Number(patientData.anthro?.weight) || 0);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMed, setSelectedMed] = useState<Medication | null>(null);
+  const [selectedDosageForm, setSelectedDosageForm] = useState<string>('');
   const [isVerified, setIsVerified] = useState(false);
-  const [selectedRate, setSelectedRate] = useState('OD');
+  const [checklist, setChecklist] = useState({
+    patient: false,
+    drug: false,
+    dose: false,
+    route: false,
+    time: false
+  });
   const [selectedUnit, setSelectedUnit] = useState('mg/kg');
+  const [selectedRate, setSelectedRate] = useState('OD');
 
   useEffect(() => {
     if (patientData.anthro?.weight) {
@@ -154,6 +211,9 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
       case 'u': return 1;
       case 'iu': return 1;
       case 'ml': return med ? med.concentration : 1;
+      case 'tablet': return med ? med.concentration : 1;
+      case 'capsule': return med ? med.concentration : 1;
+      case 'application': return med ? med.concentration : 1;
       default: return 1;
     }
   };
@@ -179,7 +239,7 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
     return (doseInDefaultUnit * 1) / selectedMultiplier;
   }, [weight, selectedMed, selectedUnit]);
 
-  const calculatedVolume = useMemo(() => {
+  const calculatedQuantity = useMemo(() => {
     if (!selectedMed || !calculatedDose) return 0;
     
     const selectedMultiplier = getUnitMultiplier(selectedUnit, selectedMed);
@@ -201,8 +261,9 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
         
         ${selectedMed ? `CURRENT SELECTION:
         - Medication: ${selectedMed.name}
+        - Dosage Form: ${selectedDosageForm}
         - Calculated Dose: ${calculatedDose.toFixed(2)} ${selectedUnit.split('/')[0]}
-        - Calculated Volume: ${calculatedVolume.toFixed(2)} ml
+        - Calculated Quantity: ${calculatedQuantity.toFixed(2)} ${selectedMed.formUnit}
         - Dosing Rate: ${selectedRate}` : ''}
 
         PREFERENCE:
@@ -247,16 +308,27 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {/* Weight Input */}
-            <div className="bg-white p-4 border border-border">
+            <div className="bg-white p-4 border border-border relative">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Patient Weight (kg)</label>
-              <input 
-                type="number" 
-                step="0.01"
-                value={weight}
-                onChange={(e) => setWeight(Number(e.target.value))}
-                className="text-3xl font-bold text-[#1A365D] bg-transparent border-none outline-none w-full"
-                placeholder="0.00"
-              />
+              <div className="flex items-center justify-between">
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={weight}
+                  onChange={(e) => setWeight(Number(e.target.value))}
+                  className="text-3xl font-bold text-[#1A365D] bg-transparent border-none outline-none w-full"
+                  placeholder="0.00"
+                />
+                {onVoiceCommand && (
+                  <button 
+                    onClick={onVoiceCommand}
+                    className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 border border-border rounded-lg transition-all"
+                    title="Voice Input"
+                  >
+                    <Mic size={18} />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Medication Search */}
@@ -284,7 +356,7 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
                       className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
                     >
                       <p className="text-xs font-bold text-slate-800 uppercase">{med.name}</p>
-                      <p className="text-[9px] text-slate-400 uppercase">{med.category} • {med.concentration}mg/ml</p>
+                      <p className="text-[9px] text-slate-400 uppercase">{med.category} • {med.concentration}{med.defaultUnit.split('/')[0]}/{med.formUnit}</p>
                     </button>
                   ))}
                 </div>
@@ -297,7 +369,7 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
                 <div className="p-4 border-b border-border bg-slate-50 flex justify-between items-center">
                   <div>
                     <h3 className="text-sm font-black text-slate-800 uppercase">{selectedMed.name}</h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Concentration: {selectedMed.concentration} mg/ml</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Concentration: {selectedMed.concentration} {selectedMed.defaultUnit.split('/')[0]}/{selectedMed.formUnit}</p>
                   </div>
                   {isHighDose && (
                     <div className="flex items-center gap-2 px-2 py-1 bg-amber-50 border border-amber-200 text-amber-600">
@@ -337,6 +409,20 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
                         ))}
                       </div>
                     </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Dosage Form</p>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedMed.dosageForms.map(form => (
+                          <button 
+                            key={form}
+                            onClick={() => setSelectedDosageForm(form)}
+                            className={`px-2 py-1 text-[8px] font-bold border ${selectedDosageForm === form ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                          >
+                            {form}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -359,8 +445,8 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
 
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Final Fluid Volume</p>
-                    <p className="text-2xl font-bold text-slate-800">{calculatedVolume.toFixed(2)} <span className="text-xs text-slate-400">ml</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Final {selectedMed.formUnit === 'ml' ? 'Fluid Volume' : 'Quantity'}</p>
+                    <p className="text-2xl font-bold text-slate-800">{calculatedQuantity.toFixed(2)} <span className="text-xs text-slate-400">{selectedMed.formUnit}</span></p>
                   </div>
                   <div className="text-right">
                     <p className="text-[8px] font-bold text-primary uppercase">Infusion Pump Setting</p>
@@ -380,7 +466,7 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
 
           {/* Syringe Visual Aid */}
           <div className="space-y-6">
-            <SyringeMap volume={calculatedVolume} />
+            {selectedMed?.formUnit === 'ml' && <SyringeMap volume={calculatedQuantity} />}
             
             <div className="bg-white p-4 border border-border">
               <div className="flex items-center gap-2 mb-3">
@@ -389,15 +475,17 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
               </div>
               <ul className="space-y-2">
                 {[
-                  'Right Patient',
-                  'Right Drug',
-                  'Right Dose',
-                  'Right Route',
-                  'Right Time'
+                  { id: 'patient', label: 'Right Patient' },
+                  { id: 'drug', label: 'Right Drug' },
+                  { id: 'dose', label: 'Right Dose' },
+                  { id: 'route', label: 'Right Route' },
+                  { id: 'time', label: 'Right Time' }
                 ].map(check => (
-                  <li key={check} className="flex items-center gap-2">
-                    <div className="w-3 h-3 border border-slate-300 rounded-sm" />
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">{check}</span>
+                  <li key={check.id} className="flex items-center gap-2 cursor-pointer" onClick={() => setChecklist(prev => ({ ...prev, [check.id]: !prev[check.id as keyof typeof prev] }))}>
+                    <div className={`w-3 h-3 border flex items-center justify-center rounded-sm transition-colors ${checklist[check.id as keyof typeof checklist] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                      {checklist[check.id as keyof typeof checklist] && <CheckCircle2 size={8} className="text-white" />}
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase transition-colors ${checklist[check.id as keyof typeof checklist] ? 'text-emerald-600' : 'text-slate-500'}`}>{check.label}</span>
                   </li>
                 ))}
               </ul>

@@ -1,4 +1,15 @@
 export type AgeGroup = 'Adult' | 'Pediatric' | 'Neonate';
+export type SynthesisFormat = 'Standard' | 'SBAR' | 'SOAP';
+export type SynthesisDepth = 'Concise' | 'Standard' | 'Detailed';
+
+export interface SynthesisOptions {
+  depth: SynthesisDepth;
+  focus: 'Diagnostic' | 'Therapeutic' | 'Educational' | 'Surgical' | 'Clinical' | 'Nursing';
+  format: SynthesisFormat;
+  includeDifferential?: boolean;
+  includePrognosis?: boolean;
+  includeHandover?: boolean;
+}
 
 export enum Type {
   TYPE_UNSPECIFIED = "TYPE_UNSPECIFIED",

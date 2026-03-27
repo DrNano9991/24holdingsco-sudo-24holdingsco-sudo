@@ -18,10 +18,23 @@ const CARDIAC_STATES: CardiacState[] = [
   { name: "ASYSTOLE", bpm: 0, color: "#64748b", state: "FATAL", mode: 'asystole' }
 ];
 
-const ECGAnimation: React.FC = () => {
+interface ECGAnimationProps {
+  rhythm?: 'normal' | 'vtach' | 'atach' | 'vfib' | 'asystole';
+  onRhythmChange?: (rhythm: string) => void;
+}
+
+const ECGAnimation: React.FC<ECGAnimationProps> = ({ rhythm, onRhythmChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const heartRef = useRef<HTMLDivElement>(null);
   const stateIdxRef = useRef(0);
+
+  // Sync internal state with prop
+  useEffect(() => {
+    if (rhythm) {
+      const idx = CARDIAC_STATES.findIndex(s => s.mode === rhythm);
+      if (idx !== -1) stateIdxRef.current = idx;
+    }
+  }, [rhythm]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,15 +51,15 @@ const ECGAnimation: React.FC = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Light Tech Grid Background
-      ctx.strokeStyle = "#E5E5E5";
+      ctx.strokeStyle = "#F1F5F9";
       ctx.lineWidth = 0.5;
-      for (let x = 0; x < canvas.width; x += 25) {
+      for (let x = 0; x < canvas.width; x += 20) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, canvas.height);
         ctx.stroke();
       }
-      for (let y = 0; y < canvas.height; y += 25) {
+      for (let y = 0; y < canvas.height; y += 20) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(canvas.width, y);
@@ -58,17 +71,17 @@ const ECGAnimation: React.FC = () => {
 
       // Adjust iteration speed based on rhythm
       const speedMap = {
-        normal: 0.2,
-        vtach: 0.6,
-        atach: 0.5,
-        vfib: 0.3,
-        asystole: 0.1
+        normal: 0.15,
+        vtach: 0.45,
+        atach: 0.4,
+        vfib: 0.25,
+        asystole: 0.05
       };
       ecgIter += speedMap[state.mode];
 
       if (state.mode === 'vfib') {
         val = 100 + (Math.random() - 0.5) * 60;
-        if (Math.random() > 0.85) {
+        if (Math.random() > 0.9) {
           pulseHeart(1.05, 0.05);
         }
       } else if (state.mode === 'asystole') {
@@ -76,8 +89,8 @@ const ECGAnimation: React.FC = () => {
       } else if (state.mode === 'vtach') {
         let cycle = ecgIter % (Math.PI * 2);
         // Wide QRS complexes, no P waves
-        if (cycle < 0.8) {
-          val -= Math.sin(cycle * (Math.PI / 0.8)) * 80; // Wide R
+        if (cycle < 1.0) {
+          val -= Math.sin(cycle * (Math.PI / 1.0)) * 85; // Wide R
           if (performance.now() - lastBeatTime > 300) {
             pulseHeart(1.15, 0.08);
             lastBeatTime = performance.now();
@@ -89,7 +102,7 @@ const ECGAnimation: React.FC = () => {
         if (cycle < 0.2) {
           val -= Math.sin(cycle * (Math.PI / 0.2)) * 10; // P
         } else if (cycle > 0.3 && cycle < 0.4) {
-          val -= 70; // R
+          val -= 75; // R
           if (performance.now() - lastBeatTime > 350) {
             pulseHeart(1.18, 0.08);
             lastBeatTime = performance.now();
@@ -118,20 +131,26 @@ const ECGAnimation: React.FC = () => {
       }
 
       ecgPoints.push(val);
-      if (ecgPoints.length > 250) ecgPoints.shift();
+      if (ecgPoints.length > 300) ecgPoints.shift();
 
       ctx.beginPath();
       ctx.strokeStyle = state.color;
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "square";
-      ctx.lineJoin = "miter";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
 
       for (let i = 0; i < ecgPoints.length; i++) {
-        const x = (i / 250) * canvas.width;
+        const x = (i / 300) * canvas.width;
         if (i === 0) ctx.moveTo(x, ecgPoints[i]);
         else ctx.lineTo(x, ecgPoints[i]);
       }
       ctx.stroke();
+
+      // Add a "glow" effect
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = state.color;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
 
       animationFrameId = requestAnimationFrame(draw);
     };
@@ -148,31 +167,39 @@ const ECGAnimation: React.FC = () => {
       });
     };
 
-    const stateInterval = setInterval(() => {
-      stateIdxRef.current = (stateIdxRef.current + 1) % CARDIAC_STATES.length;
-    }, 8000);
+    // Only auto-cycle if no rhythm prop is provided
+    let stateInterval: any;
+    if (!rhythm) {
+      stateInterval = setInterval(() => {
+        stateIdxRef.current = (stateIdxRef.current + 1) % CARDIAC_STATES.length;
+        if (onRhythmChange) onRhythmChange(CARDIAC_STATES[stateIdxRef.current].mode);
+      }, 10000);
+    }
 
     draw();
 
     return () => {
       cancelAnimationFrame(animationFrameId);
-      clearInterval(stateInterval);
+      if (stateInterval) clearInterval(stateInterval);
     };
-  }, []);
+  }, [rhythm, onRhythmChange]);
 
   const currentState = CARDIAC_STATES[stateIdxRef.current];
 
   return (
-    <div className="relative h-20 w-full bg-white border border-[#D1D1D1] overflow-hidden flex items-center p-1 shadow-none">
-      <div className="absolute top-1 left-2 z-10 flex flex-col">
-        <span className="text-[9px] font-bold text-slate-500 uppercase">Live ECG Feed</span>
-        <span className="text-[10px] font-bold" style={{ color: currentState.color }}>
-          {currentState.name} • {currentState.state}
+    <div className="relative h-24 w-full bg-white border-2 border-slate-200 overflow-hidden flex items-center p-2 rounded-lg shadow-inner">
+      <div className="absolute top-2 left-3 z-10 flex flex-col">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: currentState.color }} />
+          <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Live Cardiac Monitor</span>
+        </div>
+        <span className="text-[11px] font-black mt-0.5" style={{ color: currentState.color }}>
+          {currentState.name} • {currentState.state} • {currentState.mode === 'asystole' || currentState.mode === 'vfib' ? '--' : currentState.bpm} BPM
         </span>
       </div>
-      <canvas ref={canvasRef} width={1000} height={200} className="flex-1 h-full" />
-      <div ref={heartRef} className="heart-outer absolute right-4 border" style={{ borderColor: currentState.color + '40' }}>
-        <HeartPulse className="transition-colors duration-500" style={{ color: currentState.color }} size={24} />
+      <canvas ref={canvasRef} width={1200} height={200} className="flex-1 h-full" />
+      <div ref={heartRef} className="absolute right-6 flex items-center justify-center">
+        <HeartPulse className="transition-colors duration-500" style={{ color: currentState.color }} size={32} />
       </div>
     </div>
   );

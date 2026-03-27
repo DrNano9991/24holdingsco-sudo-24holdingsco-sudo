@@ -1,7 +1,8 @@
 import React from 'react';
-import { User, Droplets, Brain, Ruler, Activity, Thermometer } from 'lucide-react';
+import { User, Droplets, Brain, Ruler, Activity, Thermometer, ShieldCheck, Wind, Mic } from 'lucide-react';
 import ScoreCard from './ScoreCard';
-import { ExamState, LiverState } from '../types';
+import { ExamState, LiverState, CHADS2VAScState, CURB65State } from '../types';
+import { ScoringEngine } from '../services/scoringEngine';
 
 interface PhysicalExamProps {
   exam: ExamState;
@@ -10,12 +11,23 @@ interface PhysicalExamProps {
   setLiver: (liver: LiverState) => void;
   anthro: { waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; };
   setAnthro: (anthro: { waist: number | ''; height: number | ''; hip: number | ''; weight: number | ''; }) => void;
+  chads: CHADS2VAScState;
+  setChads: (chads: CHADS2VAScState) => void;
+  curb65: CURB65State;
+  setCurb65: (curb65: CURB65State) => void;
+  wellsPE: any;
+  setWellsPE: (wellsPE: any) => void;
+  onVoiceCommand?: () => void;
 }
 
 const PhysicalExam: React.FC<PhysicalExamProps> = ({ 
   exam, setExam, 
   liver, setLiver,
-  anthro, setAnthro 
+  anthro, setAnthro,
+  chads, setChads,
+  curb65, setCurb65,
+  wellsPE, setWellsPE,
+  onVoiceCommand
 }) => {
   const bmi = (anthro.weight && anthro.height) ? (Number(anthro.weight) / Math.pow(Number(anthro.height) / 100, 2)).toFixed(1) : null;
   const whr = (anthro.waist && anthro.hip) ? (Number(anthro.waist) / Number(anthro.hip)).toFixed(2) : null;
@@ -24,8 +36,18 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
     <div className="space-y-6 transition-none">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 uppercase tracking-tight">
-          <User className="text-primary" /> Physical Examination
+          <User className="text-primary" /> Physical Examination & Clinical Scores
         </h2>
+        {onVoiceCommand && (
+          <button 
+            onClick={onVoiceCommand}
+            className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 border border-border rounded-lg flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
+            title="Voice Input for Exam"
+          >
+            <Mic size={14} />
+            <span>Voice Input</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -263,6 +285,78 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
               </div>
             )}
           </div>
+        </ScoreCard>
+
+        {/* Clinical Scores (Moved from Calculators) */}
+        <ScoreCard title="CHA₂DS₂-VASc" subtitle="Stroke Risk in AF" icon={<ShieldCheck size={20} />} score={ScoringEngine.calculateCHADS2VASc(chads)}>
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { key: 'chf', label: 'CHF / LV Dysfunction (1)' },
+              { key: 'htn', label: 'Hypertension (1)' },
+              { key: 'age75', label: 'Age ≥ 75 (2)' },
+              { key: 'dm', label: 'Diabetes Mellitus (1)' },
+              { key: 'stroke', label: 'Stroke/TIA/TE (2)' },
+              { key: 'vascular', label: 'Vascular Disease (1)' },
+              { key: 'age65', label: 'Age 65-74 (1)' },
+              { key: 'female', label: 'Female Sex (1)' }
+            ].map(item => (
+              <div key={item.key} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-border/50 hover:bg-muted/50 transition-colors">
+                <span className="font-medium text-foreground text-xs">{item.label}</span>
+                <select 
+                  value={chads[item.key as keyof typeof chads] ? 'yes' : 'no'} 
+                  onChange={e => setChads({...chads, [item.key]: e.target.value === 'yes'})}
+                  className="p-1.5 bg-card border border-border rounded-lg font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </ScoreCard>
+
+        <ScoreCard title="CURB-65" subtitle="Pneumonia Severity" icon={<Wind size={20} />} score={ScoringEngine.calculateCURB65(curb65)}>
+          <div className="space-y-2">
+            {Object.entries({ confusion: 'Confusion', urea: 'Urea > 7', rr: 'RR ≥ 30', bp: 'BP < 90/60', age: 'Age ≥ 65' }).map(([key, label]) => (
+              <div key={key} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-border/50 hover:bg-muted/50 transition-colors">
+                <span className="font-medium text-foreground text-xs">{label}</span>
+                <select 
+                  value={curb65[key as keyof typeof curb65] ? 'yes' : 'no'} 
+                  onChange={e => setCurb65({...curb65, [key]: e.target.value === 'yes'})}
+                  className="p-1.5 bg-card border border-border rounded-lg font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </ScoreCard>
+
+        <ScoreCard title="Wells PE" subtitle="Pulmonary Embolism" icon={<Wind size={20}/>} score={ScoringEngine.calculateWellsPE(wellsPE)}>
+            <div className="space-y-2">
+                {Object.entries({ 
+                    dvtSymptoms: 'Clinical DVT Signs (3)', 
+                    peLikely: 'PE is #1 Diagnosis (3)', 
+                    hr100: 'HR > 100 bpm (1.5)',
+                    immobilization: 'Immob/Surgery (1.5)',
+                    priorDvtPe: 'Prior DVT/PE (1.5)',
+                    hemoptysis: 'Hemoptysis (1)',
+                    malignancy: 'Malignancy (1)'
+                }).map(([key, label]) => (
+                    <div key={key} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-border/50 hover:bg-muted/50 transition-colors">
+                        <span className="font-medium text-foreground text-xs">{label}</span>
+                        <select 
+                          value={wellsPE[key as keyof typeof wellsPE] ? 'yes' : 'no'} 
+                          onChange={e => setWellsPE({...wellsPE, [key]: e.target.value === 'yes'})}
+                          className="p-1.5 bg-card border border-border rounded-lg font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                        >
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                    </div>
+                ))}
+            </div>
         </ScoreCard>
       </div>
     </div>

@@ -3,8 +3,8 @@ import { GCSState, MEWSState, SIRSState, QSOFAState, PEWSState, AgeGroup, ExamSt
 import { GCS_OPTIONS } from '../constants';
 import ScoreCard from './ScoreCard';
 import Tooltip from './Tooltip';
-import { Brain, Activity, Zap, AlertTriangle, Baby, Info, User, Scissors, Thermometer, Droplets, Ruler, Calculator } from 'lucide-react';
-
+import { Brain, Activity, Zap, AlertTriangle, Baby, Info, User, Scissors, Thermometer, Droplets, Ruler, Calculator, Stethoscope, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ScoringEngine } from '../services/scoringEngine';
 import { speechService } from '../services/speechService';
 import { useTranslation } from '../contexts/TranslationContext';
@@ -135,142 +135,237 @@ const CombinedCalculators: React.FC<Props> = ({
     }
   };
 
+  const getGcsSeverity = (score: number) => {
+    if (score <= 8) return { label: t('severe'), color: 'text-destructive', bg: 'bg-destructive/10' };
+    if (score <= 12) return { label: t('moderate'), color: 'text-warning', bg: 'bg-warning/10' };
+    return { label: t('mild'), color: 'text-emerald-500', bg: 'bg-emerald-500/10' };
+  };
+
   const renderActiveCalculator = () => {
     switch (activeCalculator) {
-      case 'GCS':
+      case 'GCS': {
+        const severity = getGcsSeverity(gcsTotal);
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Brain className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm overflow-hidden relative"
+          >
+            {/* Background Accent */}
+            <div className={`absolute top-0 right-0 w-32 h-32 ${severity.bg} blur-3xl -mr-16 -mt-16 rounded-full transition-colors duration-500`} />
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Brain className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">GCS</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Glasgow Coma Scale</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">GCS</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Glasgow Coma Scale</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{gcsTotal}</div>
+
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="relative w-16 h-16">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      className="text-muted/20"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeDasharray={`${(gcsTotal / 15) * 100}, 100`}
+                      className={`transition-all duration-500 ${severity.color}`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xl font-bold tracking-tighter">{gcsTotal}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${severity.color}`}>
+                    {severity.label}
+                  </div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Total Score
+                  </div>
+                </div>
+              </div>
             </div>
             
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
               {(['eye', 'verbal', 'motor'] as const).map((type) => (
-                <div key={type}>
-                  <div className="flex items-center gap-1 mb-2">
-                    <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">
-                      {type === 'eye' ? t('eyeOpening') : type === 'verbal' ? t('verbalResponse') : t('motorResponse')}
-                    </p>
+                <div key={type} className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                      <p className="text-[10px] font-bold text-foreground uppercase tracking-[0.15em]">
+                        {type === 'eye' ? t('eyeOpening') : type === 'verbal' ? t('verbalResponse') : t('motorResponse')}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                      {gcs[type]}
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-1 border-2 border-slate-200 p-1 bg-slate-100">
+                  <div className="space-y-2">
                     {GCS_OPTIONS[type].map((opt) => (
                       <button
                         key={opt.value}
                         onClick={() => handleGcsChange(type, opt.value)}
-                        className={`p-2 text-left border-2 transition-none ${
+                        className={`w-full p-3 text-left rounded-xl border transition-all duration-300 group relative overflow-hidden ${
                           gcs[type] === opt.value 
-                            ? 'bg-slate-800 text-white border-slate-800 z-10' 
-                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                            ? 'bg-primary border-primary shadow-lg shadow-primary/20 scale-[1.02]' 
+                            : 'bg-muted/30 border-border/50 hover:border-primary/30 hover:bg-muted/50'
                         }`}
                       >
-                        <div className={`font-black text-[10px] uppercase ${gcs[type] === opt.value ? 'text-white' : 'text-slate-800'}`}>{t(opt.label.toLowerCase().replace(/\s+/g, '') as any)}</div>
-                        <div className={`text-[9px] font-bold ${gcs[type] === opt.value ? 'text-slate-300' : 'text-slate-400'}`}>{t(opt.sub.toLowerCase().replace(/\s+/g, '').replace(/[(),]/g, '') as any)}</div>
+                        {gcs[type] === opt.value && (
+                          <motion.div 
+                            layoutId={`${type}-active-bg`}
+                            className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80"
+                          />
+                        )}
+                        <div className="relative z-10 flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className={`font-bold text-[11px] uppercase tracking-tight truncate ${gcs[type] === opt.value ? 'text-primary-foreground' : 'text-foreground'}`}>
+                              {t(opt.label.toLowerCase().replace(/\s+/g, '') as any)}
+                            </div>
+                            <div className={`text-[9px] font-medium leading-tight mt-0.5 line-clamp-1 ${gcs[type] === opt.value ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                              {t(opt.sub.toLowerCase().replace(/\s+/g, '').replace(/[(),]/g, '') as any)}
+                            </div>
+                          </div>
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${
+                            gcs[type] === opt.value ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {opt.value}
+                          </div>
+                        </div>
                       </button>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         );
-      case 'MEWS':
+      }
+      case 'MEWS': {
+        const mewsScore = ScoringEngine.calculateMEWS(mews);
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Zap className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Zap className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">MEWS</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Modified Early Warning</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">MEWS</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Modified Early Warning</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculateMEWS(mews)}</div>
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{mewsScore}</div>
+                <div className="space-y-1">
+                  <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${mewsScore >= 5 ? 'text-destructive' : 'text-emerald-500'}`}>
+                    {mewsScore >= 5 ? t('critical') : t('stable')}
+                  </div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Total Score
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {(isMewsCritical || isVitalsCritical) && (
-                <div className="bg-red-600 text-white p-2 border-2 border-red-700 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                  <AlertTriangle size={12} />
-                  {t('criticalAlert')}
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center gap-1 mb-1">
-                    <label className="text-[11px] font-black text-slate-600 uppercase block">{t('systolicBPLabel')}</label>
-                    <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.sbp.severity)}`}>{translateStatus(vitalsClass.sbp.status)}</span>
+            <div className="space-y-8 relative z-10">
+              <AnimatePresence>
+                {(isMewsCritical || isVitalsCritical) && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="bg-destructive text-destructive-foreground p-4 rounded-2xl border border-destructive/20 shadow-lg shadow-destructive/20 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl">
+                        <AlertTriangle size={20} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">{t('criticalAlert')}</p>
+                        <p className="text-[9px] font-bold opacity-80 uppercase tracking-widest">{t('interventionRequired')}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {[
+                  { label: t('systolicBPLabel'), value: mews.sbp, setter: (v: number) => setMews({...mews, sbp: v}), vitals: vitalsClass.sbp, max: 300, normal: 120, unit: 'mmHg' },
+                  { label: t('heartRateLabel'), value: mews.hr, setter: (v: number) => setMews({...mews, hr: v}), vitals: vitalsClass.hr, max: 300, normal: 75, unit: 'bpm' },
+                  { label: t('respiratoryRateLabel'), value: mews.rr, setter: (v: number) => setMews({...mews, rr: v}), vitals: vitalsClass.rr, max: 100, normal: 16, unit: '/min' },
+                  { label: t('temperatureLabel'), value: mews.temp, setter: (v: number) => setMews({...mews, temp: v}), vitals: { severity: (mews.temp < 35 || mews.temp > 39) ? 'Abnormal' : 'Normal', status: '' }, max: 50, normal: 37, unit: '°C' },
+                ].map((field, i) => (
+                  <div key={i} className="space-y-3 group">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{field.label}</label>
+                      <div className="flex items-center gap-2">
+                        {field.vitals.severity !== 'Normal' && (
+                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                            field.vitals.severity === 'Critical' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'
+                          }`}>
+                            {translateStatus(field.vitals.status)}
+                          </span>
+                        )}
+                        <button 
+                          onClick={() => field.setter(field.normal)}
+                          className="text-[9px] font-bold text-primary hover:underline uppercase tracking-widest"
+                        >
+                          {t('setNormal')}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        value={field.value} 
+                        onChange={e => field.setter(Math.max(0, Math.min(field.max, Number(e.target.value))))}
+                        className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-16 ${
+                          field.vitals.severity === 'Critical' ? 'border-destructive/50 focus:border-destructive bg-destructive/5' : 
+                          field.vitals.severity === 'Abnormal' ? 'border-warning/50 focus:border-warning bg-warning/5' : 
+                          'border-transparent focus:border-primary focus:bg-card'
+                        }`}
+                      />
+                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">
+                        {field.unit}
+                      </span>
+                    </div>
                   </div>
-                  <input 
-                    type="number" 
-                    value={mews.sbp} 
-                    onChange={e => setMews({...mews, sbp: Math.max(0, Math.min(300, Number(e.target.value)))})}
-                    className={`w-full p-3 bg-slate-50 border-2 font-black text-sm outline-none transition-none ${
-                      vitalsClass.sbp.severity === 'Critical' ? 'border-red-500' : vitalsClass.sbp.severity === 'Abnormal' ? 'border-orange-500' : 'border-slate-200 focus:border-slate-800'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1 mb-1">
-                    <label className="text-[11px] font-black text-slate-600 uppercase block">{t('heartRateLabel')}</label>
-                    <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.hr.severity)}`}>{translateStatus(vitalsClass.hr.status)}</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    value={mews.hr} 
-                    onChange={e => setMews({...mews, hr: Math.max(0, Math.min(300, Number(e.target.value)))})}
-                    className={`w-full p-3 bg-slate-50 border-2 font-black text-sm outline-none transition-none ${
-                      vitalsClass.hr.severity === 'Critical' ? 'border-red-500' : vitalsClass.hr.severity === 'Abnormal' ? 'border-orange-500' : 'border-slate-200 focus:border-slate-800'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1 mb-1">
-                    <label className="text-[11px] font-black text-slate-600 uppercase block">{t('respiratoryRateLabel')}</label>
-                    <span className={`text-[10px] font-bold ${getSeverityColor(vitalsClass.rr.severity)}`}>{translateStatus(vitalsClass.rr.status)}</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    value={mews.rr} 
-                    onChange={e => setMews({...mews, rr: Math.max(0, Math.min(100, Number(e.target.value)))})}
-                    className={`w-full p-3 bg-slate-50 border-2 font-black text-sm outline-none transition-none ${
-                      vitalsClass.rr.severity === 'Critical' ? 'border-red-500' : vitalsClass.rr.severity === 'Abnormal' ? 'border-orange-500' : 'border-slate-200 focus:border-slate-800'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('temperatureLabel')}</label>
-                  <input 
-                    type="number" 
-                    value={mews.temp} 
-                    onChange={e => setMews({...mews, temp: Number(e.target.value)})}
-                    className={`w-full p-3 bg-slate-50 border-2 font-black text-sm outline-none transition-none ${
-                      mews.temp < 35 || mews.temp > 39 ? 'border-orange-500' : 'border-slate-200 focus:border-slate-800'
-                    }`}
-                  />
-                </div>
+                ))}
               </div>
-              <div>
-                <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('avpu')} Score</label>
-                <div className="grid grid-cols-4 gap-1 border-2 border-slate-200 p-1 bg-slate-100">
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                  <label className="text-[10px] font-bold text-foreground uppercase tracking-[0.15em]">{t('avpu')} Score</label>
+                </div>
+                <div className="grid grid-cols-4 gap-2 bg-muted/30 p-1.5 rounded-2xl border border-border/50">
                   {['Alert', 'Voice', 'Pain', 'Unresp'].map((label, i) => (
                     <button
                       key={i}
                       onClick={() => setMews({...mews, avpu: i})}
-                      className={`p-2 border-2 text-[10px] font-black uppercase transition-none ${
+                      className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all duration-300 ${
                         mews.avpu === i 
-                          ? 'bg-slate-800 text-white border-slate-800 z-10' 
-                          : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]' 
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                       }`}
                     >
                       {label}
@@ -279,83 +374,124 @@ const CombinedCalculators: React.FC<Props> = ({
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         );
-      case 'SIRS':
+      }
+      case 'SIRS': {
+        const sirsScore = ScoringEngine.calculateSIRS(sirs);
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Activity className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Activity className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">SIRS</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{t('inflammatoryResponse')}</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">SIRS</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{t('inflammatoryResponse')}</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculateSIRS(sirs)}</div>
-            </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">{t('temperatureLabel')}</label>
-                  <input 
-                    type="number" 
-                    value={sirs.temp} 
-                    onChange={e => setSirs({...sirs, temp: e.target.value === '' ? '' : Number(e.target.value)})}
-                    className={`w-full p-3 bg-slate-50 border-2 font-black text-sm outline-none transition-none ${
-                      sirs.temp !== '' && (sirs.temp < 30 || sirs.temp > 45) ? 'border-red-500' : 'border-slate-200 focus:border-slate-800'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">{t('wbcCountLabel')}</label>
-                  <input 
-                    type="number" 
-                    value={sirs.wbc} 
-                    onChange={e => setSirs({...sirs, wbc: e.target.value === '' ? '' : Number(e.target.value)})}
-                    className={`w-full p-3 bg-slate-50 border-2 font-black text-sm outline-none transition-none ${
-                      sirs.wbc !== '' && (sirs.wbc < 0 || sirs.wbc > 100) ? 'border-red-500' : 'border-slate-200 focus:border-slate-800'
-                    }`}
-                  />
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{sirsScore}</div>
+                <div className="space-y-1">
+                  <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${sirsScore >= 2 ? 'text-destructive' : 'text-emerald-500'}`}>
+                    {sirsScore >= 2 ? t('positive') : t('negative')}
+                  </div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Total Score
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+            <div className="space-y-8 relative z-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('temperatureLabel')}</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      value={sirs.temp} 
+                      onChange={e => setSirs({...sirs, temp: e.target.value === '' ? '' : Number(e.target.value)})}
+                      className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-16 ${
+                        sirs.temp !== '' && (sirs.temp < 36 || sirs.temp > 38) ? 'border-warning/50 focus:border-warning bg-warning/5' : 'border-transparent focus:border-primary focus:bg-card'
+                      }`}
+                    />
+                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">°C</span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('wbcCountLabel')}</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      value={sirs.wbc} 
+                      onChange={e => setSirs({...sirs, wbc: e.target.value === '' ? '' : Number(e.target.value)})}
+                      className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-16 ${
+                        sirs.wbc !== '' && (sirs.wbc < 4 || sirs.wbc > 12) ? 'border-warning/50 focus:border-warning bg-warning/5' : 'border-transparent focus:border-primary focus:bg-card'
+                      }`}
+                    />
+                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">10³/µL</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         );
-      case 'qSOFA':
+      }
+      case 'qSOFA': {
+        const qsofaScore = ScoringEngine.calculateQSOFA(qsofa);
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Zap className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Zap className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">qSOFA</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{t('quickSepsisOrganFailure')}</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">qSOFA</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{t('quickSepsisOrganFailure')}</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculateQSOFA(qsofa)}</div>
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{qsofaScore}</div>
+                <div className="space-y-1">
+                  <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${qsofaScore >= 2 ? 'text-destructive' : 'text-emerald-500'}`}>
+                    {qsofaScore >= 2 ? t('highRisk') : t('lowRisk')}
+                  </div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Total Score
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-4 relative z-10">
               {[
-                { label: 'SBP ≤ 100 mmHg', key: 'lowBP' },
-                { label: 'Resp Rate ≥ 22/min', key: 'highRR' },
-                { label: t('alteredMentation'), key: 'alteredMentation' }
+                { label: 'SBP ≤ 100 mmHg', key: 'lowBP', sub: 'Systolic Blood Pressure' },
+                { label: 'Resp Rate ≥ 22/min', key: 'highRR', sub: 'Respiratory Frequency' },
+                { label: t('alteredMentation'), key: 'alteredMentation', sub: 'GCS < 15' }
               ].map((item) => (
-                <div key={item.key} className="flex items-center justify-between p-3 bg-slate-50 border-2 border-slate-200">
-                  <span className="font-black text-slate-800 text-[11px] uppercase tracking-tight">{item.label}</span>
-                  <div className="flex gap-1">
+                <div key={item.key} className="flex items-center justify-between p-5 bg-muted/30 rounded-2xl border border-border/50 group transition-all hover:bg-muted/50">
+                  <div className="space-y-0.5">
+                    <span className="font-black text-foreground text-[11px] uppercase tracking-tight block">{item.label}</span>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{item.sub}</span>
+                  </div>
+                  <div className="flex gap-2 bg-muted p-1 rounded-xl border border-border/50">
                     {[false, true].map((val) => (
                       <button
                         key={val ? 'yes' : 'no'}
                         onClick={() => setQsofa({...qsofa, [item.key]: val})}
-                        className={`px-3 py-1 border-2 text-[10px] font-black uppercase transition-none ${
+                        className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${
                           qsofa[item.key as keyof QSOFAState] === val
-                            ? 'bg-slate-800 text-white border-slate-800'
-                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                            ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.05]'
+                            : 'text-muted-foreground hover:bg-accent'
                         }`}
                       >
                         {val ? 'Yes' : 'No'}
@@ -365,43 +501,78 @@ const CombinedCalculators: React.FC<Props> = ({
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         );
-      case 'PEWS':
+      }
+      case 'PEWS': {
+        const pewsScore = ScoringEngine.calculatePEWS(pews);
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Baby className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Baby className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">PEWS</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{t('pediatricEarlyWarning')}</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">PEWS</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{t('pediatricEarlyWarning')}</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculatePEWS(pews)}</div>
-            </div>
-            <div className="space-y-4">
-              {isPewsCritical && (
-                <div className="bg-red-600 text-white p-2 border-2 border-red-700 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                  <AlertTriangle size={12} />
-                  {t('criticalAlert')}
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{pewsScore}</div>
+                <div className="space-y-1">
+                  <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${pewsScore >= 5 ? 'text-destructive' : 'text-emerald-500'}`}>
+                    {pewsScore >= 5 ? t('critical') : t('stable')}
+                  </div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Total Score
+                  </div>
                 </div>
-              )}
-              <div className="grid grid-cols-1 gap-4">
+              </div>
+            </div>
+
+            <div className="space-y-8 relative z-10">
+              <AnimatePresence>
+                {isPewsCritical && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="bg-destructive text-destructive-foreground p-4 rounded-2xl border border-destructive/20 shadow-lg shadow-destructive/20 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl">
+                        <AlertTriangle size={20} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">{t('criticalAlert')}</p>
+                        <p className="text-[9px] font-bold opacity-80 uppercase tracking-widest">{t('interventionRequired')}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="grid grid-cols-1 gap-8">
                 {(['behavior', 'cardiovascular', 'respiratory'] as const).map((type) => (
-                  <div key={type}>
-                    <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t(type as any)} (0-3)</label>
-                    <div className="flex gap-1 border-2 border-slate-200 p-1 bg-slate-100">
+                  <div key={type} className="space-y-4">
+                    <div className="flex items-center gap-2 px-1">
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                      <label className="text-[10px] font-bold text-foreground uppercase tracking-[0.15em]">{t(type as any)} (0-3)</label>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 bg-muted/30 p-1.5 rounded-2xl border border-border/50">
                       {[0, 1, 2, 3].map((val) => (
                         <button
                           key={val}
                           onClick={() => setPews({...pews, [type]: val})}
-                          className={`flex-1 p-2 border-2 text-xs font-black transition-none ${
+                          className={`py-4 rounded-xl text-xs font-black transition-all duration-300 ${
                             pews[type] === val 
-                              ? 'bg-slate-800 text-white border-slate-800 z-10' 
-                              : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                              ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]' 
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                           }`}
                         >
                           {val}
@@ -411,22 +582,23 @@ const CombinedCalculators: React.FC<Props> = ({
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-2">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {[
                   { label: t('nebulizer'), key: 'nebulizer' },
                   { label: t('vomiting'), key: 'persistentVomiting' }
                 ].map((item) => (
-                  <div key={item.key} className="p-3 bg-slate-50 border-2 border-slate-200">
-                    <span className="text-[10px] font-black text-slate-600 uppercase block mb-2">{item.label}</span>
-                    <div className="flex gap-1">
+                  <div key={item.key} className="p-5 bg-muted/30 rounded-2xl border border-border/50 space-y-4">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">{item.label}</span>
+                    <div className="flex gap-2 bg-muted p-1 rounded-xl border border-border/50">
                       {[false, true].map((val) => (
                         <button
                           key={val ? 'yes' : 'no'}
                           onClick={() => setPews({...pews, [item.key as keyof PEWSState]: val})}
-                          className={`flex-1 py-1 border-2 text-[10px] font-black uppercase transition-none ${
+                          className={`flex-1 py-3 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${
                             pews[item.key as keyof PEWSState] === val
-                              ? 'bg-slate-800 text-white border-slate-800'
-                              : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                              : 'text-muted-foreground hover:bg-accent'
                           }`}
                         >
                           {val ? 'Yes' : 'No'}
@@ -437,77 +609,113 @@ const CombinedCalculators: React.FC<Props> = ({
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         );
-      case 'Surgical':
+      }
+      case 'Surgical': {
+        const ariscatRisk = getAriscatRisk(ariscatScore);
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Scissors className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Scissors className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">{t('surgicalRisk')}</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">ARISCAT Score</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">{t('surgicalRisk')}</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">ARISCAT Score</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ariscatScore}</div>
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{ariscatScore}</div>
+                <div className="space-y-1">
+                  <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${ariscatRisk.color}`}>
+                    {ariscatRisk.label}
+                  </div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Total Score
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-3 py-2 bg-slate-800 border-2 border-slate-800">
-                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{t('riskLevel')}</span>
-                <span className={`text-xs font-black uppercase text-white`}>{ariscatRisk.label}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">ASA Status</label>
-                  <select 
-                    value={surgery.asa} 
-                    onChange={e => setSurgery({...surgery, asa: Number(e.target.value)})}
-                    className="w-full p-2 bg-slate-50 border-2 border-slate-200 font-black text-sm outline-none focus:border-slate-800 transition-none"
-                  >
-                    {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>ASA {v}</option>)}
-                  </select>
+
+            <div className="space-y-8 relative z-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">ASA Status</label>
+                  <div className="grid grid-cols-5 gap-2 bg-muted/30 p-1.5 rounded-2xl border border-border/50">
+                    {[1, 2, 3, 4, 5].map(v => (
+                      <button
+                        key={v}
+                        onClick={() => setSurgery({...surgery, asa: v})}
+                        className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${
+                          surgery.asa === v 
+                            ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.05]' 
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">Pre-op SpO2 (%)</label>
-                  <input 
-                    type="number" 
-                    value={surgery.preOpSpO2} 
-                    onChange={e => setSurgery({...surgery, preOpSpO2: e.target.value === '' ? '' : Number(e.target.value)})}
-                    className="w-full p-2 bg-slate-50 border-2 border-slate-200 font-black text-sm outline-none focus:border-slate-800 transition-none"
-                  />
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Pre-op SpO2 (%)</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      value={surgery.preOpSpO2} 
+                      onChange={e => setSurgery({...surgery, preOpSpO2: e.target.value === '' ? '' : Number(e.target.value)})}
+                      className="w-full p-5 bg-muted/30 rounded-2xl border-2 border-transparent font-mono text-2xl font-bold outline-none focus:border-primary focus:bg-card transition-all pr-16"
+                    />
+                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">%</span>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('surgicalSite')}</label>
-                <select 
-                  value={surgery.surgeryType} 
-                  onChange={e => setSurgery({...surgery, surgeryType: e.target.value})}
-                  className="w-full p-2 bg-slate-50 border-2 border-slate-200 font-black text-sm outline-none focus:border-slate-800 transition-none"
-                >
-                  <option value="Peripheral">{t('peripheral')}</option>
-                  <option value="Upper Abdominal">{t('upperAbdominal')}</option>
-                  <option value="Intrathoracic">{t('intrathoracic')}</option>
-                </select>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">{t('surgicalSite')}</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { label: t('peripheral'), value: 'Peripheral' },
+                    { label: t('upperAbdominal'), value: 'Upper Abdominal' },
+                    { label: t('intrathoracic'), value: 'Intrathoracic' }
+                  ].map((type) => (
+                    <button
+                      key={type.value}
+                      onClick={() => setSurgery({...surgery, surgeryType: type.value})}
+                      className={`p-4 rounded-2xl border-2 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                        surgery.surgeryType === type.value
+                          ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
+                          : 'bg-muted/30 border-border/50 text-muted-foreground hover:border-primary/30'
+                      }`}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {[
                   { label: t('respiratoryInfection'), key: 'respInfection' },
                   { label: t('anemia'), key: 'preOpAnemia' }
                 ].map((item) => (
-                  <div key={item.key} className="p-3 bg-slate-50 border-2 border-slate-200">
-                    <span className="text-[10px] font-black text-slate-600 uppercase block mb-2">{item.label}</span>
-                    <div className="flex gap-1">
+                  <div key={item.key} className="p-5 bg-muted/30 rounded-2xl border border-border/50 space-y-4">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">{item.label}</span>
+                    <div className="flex gap-2 bg-muted p-1 rounded-xl border border-border/50">
                       {[false, true].map((val) => (
                         <button
                           key={val ? 'yes' : 'no'}
                           onClick={() => setSurgery({...surgery, [item.key as keyof SurgicalState]: val})}
-                          className={`flex-1 py-1 border-2 text-[10px] font-black uppercase transition-none ${
+                          className={`flex-1 py-3 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${
                             surgery[item.key as keyof SurgicalState] === val
-                              ? 'bg-slate-800 text-white border-slate-800'
-                              : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                              : 'text-muted-foreground hover:bg-accent'
                           }`}
                         >
                           {val ? 'Yes' : 'No'}
@@ -517,14 +725,19 @@ const CombinedCalculators: React.FC<Props> = ({
                   </div>
                 ))}
               </div>
-              <div>
-                <label className="text-[11px] font-black text-slate-600 uppercase block mb-1">{t('duration')}</label>
-                <div className="grid grid-cols-3 gap-1 border-2 border-slate-200 p-1 bg-slate-100">
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">{t('duration')}</label>
+                <div className="grid grid-cols-3 gap-3 bg-muted/30 p-1.5 rounded-2xl border border-border/50">
                   {['<2h', '2-3h', '>3h'].map(d => (
                     <button 
                       key={d} 
                       onClick={() => setSurgery({...surgery, duration: d})}
-                      className={`p-2 border-2 text-[10px] font-black uppercase transition-none ${surgery.duration === d ? 'bg-slate-800 text-white border-slate-800 z-10' : 'bg-white text-slate-400 border-transparent hover:border-slate-200'}`}
+                      className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all duration-300 ${
+                        surgery.duration === d 
+                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]' 
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
                     >
                       {d}
                     </button>
@@ -532,46 +745,74 @@ const CombinedCalculators: React.FC<Props> = ({
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         );
-      case 'PHQ-9':
+      }
+      case 'PHQ-9': {
+        const phq9Score = ScoringEngine.calculatePHQ9(phq9);
+        const questions = [
+          'Little interest or pleasure in doing things',
+          'Feeling down, depressed, or hopeless',
+          'Trouble falling or staying asleep, or sleeping too much',
+          'Feeling tired or having little energy',
+          'Poor appetite or overeating',
+          'Feeling bad about yourself — or that you are a failure or have let yourself or your family down',
+          'Trouble concentrating on things, such as reading the newspaper or watching television',
+          'Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual',
+          'Thoughts that you would be better off dead or of hurting yourself in some way'
+        ];
+        const answeredCount = Object.values(phq9).filter(v => v !== -1).length;
+        const progress = (answeredCount / questions.length) * 100;
+
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Brain className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Brain className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">PHQ-9</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Depression Severity</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">PHQ-9</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Depression Severity</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculatePHQ9(phq9)}</div>
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{phq9Score}</div>
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                    {t('totalScore')}
+                  </div>
+                  <div className="w-full bg-muted h-1 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      className="bg-primary h-full"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-              {[
-                'Little interest or pleasure in doing things',
-                'Feeling down, depressed, or hopeless',
-                'Trouble falling or staying asleep, or sleeping too much',
-                'Feeling tired or having little energy',
-                'Poor appetite or overeating',
-                'Feeling bad about yourself — or that you are a failure or have let yourself or your family down',
-                'Trouble concentrating on things, such as reading the newspaper or watching television',
-                'Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual',
-                'Thoughts that you would be better off dead or of hurting yourself in some way'
-              ].map((q, i) => (
-                <div key={i} className="p-3 bg-slate-50 border-2 border-slate-200">
-                  <p className="text-[11px] font-black text-slate-700 uppercase mb-2">{i + 1}. {q}</p>
-                  <div className="grid grid-cols-4 gap-1">
+
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar relative z-10">
+              {questions.map((q, i) => (
+                <div key={i} className="p-6 bg-muted/30 rounded-2xl border border-border/50 space-y-5 transition-all hover:bg-muted/50">
+                  <div className="flex gap-4">
+                    <span className="flex-shrink-0 w-6 h-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center text-[10px] font-black">{i + 1}</span>
+                    <p className="text-xs font-bold text-foreground leading-relaxed">{q}</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {['Not at all', 'Several days', 'More than half', 'Nearly every day'].map((label, val) => (
                       <button
                         key={val}
                         onClick={() => setPhq9({...phq9, [`q${i+1}`]: val})}
-                        className={`p-1 border-2 text-[8px] font-black uppercase transition-none ${
+                        className={`p-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${
                           phq9[`q${i+1}` as keyof PHQ9State] === val
-                            ? 'bg-slate-800 text-white border-slate-800'
-                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20 scale-[1.05]'
+                            : 'bg-card text-muted-foreground border-border/50 hover:border-primary/30'
                         }`}
                       >
                         {label}
@@ -581,44 +822,72 @@ const CombinedCalculators: React.FC<Props> = ({
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         );
-      case 'GAD-7':
+      }
+      case 'GAD-7': {
+        const gad7Score = ScoringEngine.calculateGAD7(gad7);
+        const questions = [
+          'Feeling nervous, anxious or on edge',
+          'Not being able to stop or control worrying',
+          'Worrying too much about different things',
+          'Trouble relaxing',
+          'Being so restless that it is hard to sit still',
+          'Becoming easily annoyed or irritable',
+          'Feeling afraid as if something awful might happen'
+        ];
+        const answeredCount = Object.values(gad7).filter(v => v !== -1).length;
+        const progress = (answeredCount / questions.length) * 100;
+
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Brain className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Brain className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">GAD-7</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Anxiety Severity</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">GAD-7</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Anxiety Severity</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculateGAD7(gad7)}</div>
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{gad7Score}</div>
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                    {t('totalScore')}
+                  </div>
+                  <div className="w-full bg-muted h-1 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      className="bg-primary h-full"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-              {[
-                'Feeling nervous, anxious or on edge',
-                'Not being able to stop or control worrying',
-                'Worrying too much about different things',
-                'Trouble relaxing',
-                'Being so restless that it is hard to sit still',
-                'Becoming easily annoyed or irritable',
-                'Feeling afraid as if something awful might happen'
-              ].map((q, i) => (
-                <div key={i} className="p-3 bg-slate-50 border-2 border-slate-200">
-                  <p className="text-[11px] font-black text-slate-700 uppercase mb-2">{i + 1}. {q}</p>
-                  <div className="grid grid-cols-4 gap-1">
+
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar relative z-10">
+              {questions.map((q, i) => (
+                <div key={i} className="p-6 bg-muted/30 rounded-2xl border border-border/50 space-y-5 transition-all hover:bg-muted/50">
+                  <div className="flex gap-4">
+                    <span className="flex-shrink-0 w-6 h-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center text-[10px] font-black">{i + 1}</span>
+                    <p className="text-xs font-bold text-foreground leading-relaxed">{q}</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {['Not at all', 'Several days', 'More than half', 'Nearly every day'].map((label, val) => (
                       <button
                         key={val}
                         onClick={() => setGad7({...gad7, [`q${i+1}`]: val})}
-                        className={`p-1 border-2 text-[8px] font-black uppercase transition-none ${
+                        className={`p-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${
                           gad7[`q${i+1}` as keyof GAD7State] === val
-                            ? 'bg-slate-800 text-white border-slate-800'
-                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20 scale-[1.05]'
+                            : 'bg-card text-muted-foreground border-border/50 hover:border-primary/30'
                         }`}
                       >
                         {label}
@@ -628,47 +897,63 @@ const CombinedCalculators: React.FC<Props> = ({
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         );
-      case 'AMTS':
+      }
+      case 'AMTS': {
+        const amtsScore = ScoringEngine.calculateAMTS(amts);
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Brain className="text-white" size={20} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-8 rounded-3xl border border-border shadow-sm relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                  <Brain className="text-primary" size={28} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">AMTS</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cognitive Screen</p>
+                  <h3 className="text-2xl font-bold text-foreground tracking-tight">AMTS</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Cognitive Screen</p>
                 </div>
               </div>
-              <div className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{ScoringEngine.calculateAMTS(amts)}</div>
+              <div className="flex items-center gap-6 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                <div className="text-4xl font-black text-primary tracking-tighter">{amtsScore}</div>
+                <div className="space-y-1">
+                  <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${amtsScore < 7 ? 'text-destructive' : 'text-emerald-500'}`}>
+                    {amtsScore < 7 ? t('impaired') : t('normal')}
+                  </div>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Total Score
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3 relative z-10">
               {[
                 { label: 'Age', key: 'age' },
                 { label: 'Time (nearest hour)', key: 'time' },
                 { label: 'Address (recall at end)', key: 'address' },
                 { label: 'Year', key: 'year' },
-                { label: 'Place (name of hospital/building)', key: 'place' },
+                { label: 'Place (hospital/building)', key: 'place' },
                 { label: 'Recognition of two persons', key: 'recognition' },
                 { label: 'Date of Birth', key: 'dob' },
                 { label: 'Monarch / President', key: 'monarch' },
                 { label: 'Dates of WW2', key: 'ww2' },
                 { label: 'Count backwards 20 to 1', key: 'countBackwards' }
               ].map((item) => (
-                <div key={item.key} className="flex items-center justify-between p-3 bg-slate-50 border-2 border-slate-200">
-                  <span className="font-black text-slate-800 text-[11px] uppercase tracking-tight">{item.label}</span>
-                  <div className="flex gap-1">
+                <div key={item.key} className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border border-border/50 group transition-all hover:bg-muted/50">
+                  <span className="font-black text-foreground text-[11px] uppercase tracking-tight">{item.label}</span>
+                  <div className="flex gap-2 bg-muted p-1 rounded-xl border border-border/50">
                     {[false, true].map((val) => (
                       <button
                         key={val ? 'yes' : 'no'}
                         onClick={() => setAmts({...amts, [item.key as keyof AMTSState]: val})}
-                        className={`px-3 py-1 border-2 text-[10px] font-black uppercase transition-none ${
+                        className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${
                           amts[item.key as keyof AMTSState] === val
-                            ? 'bg-slate-800 text-white border-slate-800'
-                            : 'bg-white text-slate-400 border-transparent hover:border-slate-200'
+                            ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.05]'
+                            : 'text-muted-foreground hover:bg-accent'
                         }`}
                       >
                         {val ? 'Correct' : 'Incorrect'}
@@ -678,34 +963,66 @@ const CombinedCalculators: React.FC<Props> = ({
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         );
+      }
       case 'Anthro':
         return (
-          <div className="bg-white border-4 border-slate-800 p-6 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] transition-none animate-slide-in">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Ruler className="text-white" size={20} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-800 leading-none uppercase tracking-tight">{t('anthropometrics')}</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">BMI & WHR</p>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card p-12 rounded-3xl border border-border shadow-sm text-center relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+            <div className="relative z-10 space-y-6">
+              <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                <Ruler size={40} className="text-primary" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-foreground tracking-tight">{t('anthropometrics')}</h3>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">{t('usePhysicalExamTab')}</p>
+              </div>
+              <div className="pt-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <Info size={14} />
+                  BMI & WHR Calculations
                 </div>
               </div>
             </div>
-            <div className="p-4 bg-slate-50 border-2 border-slate-200 text-center">
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">{t('usePhysicalExamTab')}</p>
-            </div>
-          </div>
+          </motion.div>
         );
 
       default:
         return (
-          <div className="bg-white border-4 border-slate-800 p-12 text-center shadow-[8px_8px_0px_0px_rgba(30,41,59,1)]">
-            <Calculator size={48} className="mx-auto text-slate-200 mb-4" />
-            <p className="text-slate-400 font-black uppercase tracking-widest">Select a calculator above to begin</p>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card p-16 rounded-3xl border border-border shadow-sm text-center relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 pointer-events-none" />
+            <div className="relative z-10 space-y-8">
+              <div className="relative mx-auto w-24 h-24">
+                <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping opacity-20" />
+                <div className="relative w-24 h-24 bg-muted rounded-3xl flex items-center justify-center shadow-inner">
+                  <Calculator size={48} className="text-primary/40" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-2xl font-bold text-foreground tracking-tight">Select Calculator</h3>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto leading-relaxed">Choose a specialized clinical calculator from the toolbar above to begin your assessment.</p>
+              </div>
+              <div className="flex justify-center gap-4">
+                <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                  Real-time scoring
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                  Clinical alerts
+                </div>
+              </div>
+            </div>
+          </motion.div>
         );
     }
   };
@@ -713,22 +1030,28 @@ const CombinedCalculators: React.FC<Props> = ({
   return (
     <div className="space-y-6">
       {isAnyCritical && (
-        <div className="bg-red-600 text-white p-4 border border-red-400 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20">
-              <AlertTriangle size={24} />
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-destructive text-destructive-foreground p-8 rounded-[2rem] border border-destructive/20 shadow-2xl shadow-destructive/30 flex items-center justify-between relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent pointer-events-none" />
+          <div className="flex items-center gap-6 relative z-10">
+            <div className="p-4 bg-white/20 rounded-2xl shadow-inner animate-pulse">
+              <AlertTriangle size={32} />
             </div>
-            <div>
-              <h3 className="text-lg font-bold uppercase tracking-tighter leading-none text-white">{t('criticalAlert')}</h3>
-              <p className="text-[10px] font-bold opacity-90 uppercase tracking-widest mt-1">{t('interventionRequired')}</p>
+            <div className="space-y-1">
+              <h4 className="text-2xl font-black uppercase tracking-[0.1em] leading-tight">{t('criticalAlert')}</h4>
+              <p className="text-xs font-bold opacity-80 uppercase tracking-widest">{t('interventionRequired')}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold leading-none">
+          <div className="hidden sm:flex flex-col items-end relative z-10">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Current Score</div>
+            <div className="text-4xl font-black tracking-tighter leading-none">
               {ageGroup === 'Adult' ? `MEWS: ${ScoringEngine.calculateMEWS(mews)}` : `PEWS: ${ScoringEngine.calculatePEWS(pews)}`}
-            </p>
+            </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       <div className="max-w-3xl mx-auto">

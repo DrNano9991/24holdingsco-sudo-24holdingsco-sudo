@@ -1,15 +1,24 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Circle, Plus, Trash2, User, UserPlus, ClipboardList, CheckCircle, Clock, Printer } from 'lucide-react';
+import { CheckCircle2, Circle, Plus, Trash2, User, UserPlus, ClipboardList, CheckCircle, Clock, Printer, Filter, ChevronDown, AlertCircle } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Task, SavedPatient } from '../types';
 import { speechService } from '../services/speechService';
+import { toast } from 'react-hot-toast';
 
-const TaskList: React.FC = () => {
-  const [tasks, setTasks] = useLocalStorage<Task[]>('ai-medica-tasks', []);
-  const [patients] = useLocalStorage<SavedPatient[]>('ai-medica-saved-patients', []);
+interface TaskListProps {
+  tasks: Task[];
+  setTasks: (tasks: Task[]) => void;
+  patients: SavedPatient[];
+}
+
+const TaskList: React.FC<TaskListProps> = ({ tasks, setTasks, patients }) => {
   const [newTask, setNewTask] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [taskPriority, setTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [filter, setFilter] = useState<'all' | 'pending' | 'executed'>('all');
+  const [patientFilter, setPatientFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const addTask = () => {
     if (!newTask.trim()) return;
@@ -20,7 +29,7 @@ const TaskList: React.FC = () => {
       id: Date.now().toString(),
       text: newTask,
       completed: false,
-      priority: 'medium',
+      priority: taskPriority,
       patientId: selectedPatientId || undefined,
       patientName: patient?.name,
       createdAt: new Date().toISOString()
@@ -28,10 +37,10 @@ const TaskList: React.FC = () => {
     
     setTasks([...tasks, task]);
     setNewTask('');
+    setTaskPriority('medium');
     
-    // @ts-ignore - logGuestAction is passed or available globally? 
-    // Actually I should probably pass it or use a custom event.
-    // Let's use a custom event to communicate with App.tsx
+    toast.success('Task registered successfully');
+    
     window.dispatchEvent(new CustomEvent('guest-action', { detail: `Added clinical task: ${task.text}${patient ? ` for patient ${patient.name}` : ''}` }));
     
     const message = `Task registered: ${task.text}${patient ? ` for patient ${patient.name}` : ''}.`;
@@ -43,6 +52,10 @@ const TaskList: React.FC = () => {
       if (t.id === id) {
         const newState = !t.completed;
         const message = `Task ${t.text} marked as ${newState ? 'executed' : 'pending'}.`;
+        
+        if (newState) {
+          toast.success('Task completed', { icon: '✅' });
+        }
         
         window.dispatchEvent(new CustomEvent('guest-action', { detail: `Marked task "${t.text}" as ${newState ? 'executed' : 'pending'}` }));
         
@@ -60,6 +73,7 @@ const TaskList: React.FC = () => {
   const deleteTask = (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (task) {
+      toast.error('Task deleted', { icon: '🗑️' });
       speechService.speak(`Task ${task.text} deleted.`);
       window.dispatchEvent(new CustomEvent('guest-action', { detail: `Deleted task: ${task.text}` }));
     }
@@ -188,8 +202,10 @@ const TaskList: React.FC = () => {
   };
 
   const filteredTasks = tasks.filter(t => {
-    if (filter === 'pending') return !t.completed;
-    if (filter === 'executed') return t.completed;
+    if (filter === 'pending' && t.completed) return false;
+    if (filter === 'executed' && !t.completed) return false;
+    if (patientFilter !== 'all' && t.patientId !== patientFilter) return false;
+    if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     return true;
   });
 
@@ -220,8 +236,8 @@ const TaskList: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
+            <div className="flex flex-col md:flex-row items-center gap-3">
+              <div className="flex-1 w-full">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1 ml-1">Link to Patient Case</label>
                 <select 
                   value={selectedPatientId}
@@ -233,6 +249,24 @@ const TaskList: React.FC = () => {
                     <option key={p.id} value={p.id}>{p.name} ({new Date(p.date).toLocaleDateString()})</option>
                   ))}
                 </select>
+              </div>
+              <div className="w-full md:w-48">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1 ml-1">Priority Level</label>
+                <div className="flex gap-1 p-1 bg-slate-50 border border-border">
+                  {(['low', 'medium', 'high'] as const).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setTaskPriority(p)}
+                      className={`flex-1 py-1 text-[8px] font-black uppercase tracking-tighter border border-border transition-none ${
+                        taskPriority === p 
+                          ? p === 'high' ? 'bg-red-600 text-white border-red-700' : p === 'medium' ? 'bg-orange-400 text-white border-orange-500' : 'bg-emerald-500 text-white border-emerald-600'
+                          : 'bg-white text-slate-400 hover:bg-slate-50'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -248,24 +282,61 @@ const TaskList: React.FC = () => {
       </div>
 
       {/* Task List Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 border border-border p-1 bg-slate-50">
-          {(['all', 'pending', 'executed'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 border border-border text-[10px] font-bold uppercase tracking-widest transition-none ${
-                filter === f 
-                  ? 'bg-slate-400 text-white border-slate-500 z-10' 
-                  : 'bg-white text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+      <div className="flex flex-col md:flex-row items-center gap-4">
+        <div className="flex flex-col gap-1 w-full md:w-auto">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Status Filter</label>
+          <div className="flex gap-1 border border-border p-1 bg-slate-50">
+            {(['all', 'pending', 'executed'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-1.5 border border-border text-[10px] font-bold uppercase tracking-widest transition-none ${
+                  filter === f 
+                    ? 'bg-slate-400 text-white border-slate-500 z-10' 
+                    : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          Showing {filteredTasks.length} {filter} tasks
+
+        <div className="flex flex-col gap-1 w-full md:w-auto">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Filter</label>
+          <select 
+            value={patientFilter}
+            onChange={e => setPatientFilter(e.target.value)}
+            className="bg-white border border-border px-3 py-1.5 font-bold text-[10px] uppercase tracking-widest outline-none focus:border-primary transition-none text-slate-600"
+          >
+            <option value="all">All Patients</option>
+            {patients.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1 w-full md:w-auto">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Priority Filter</label>
+          <div className="flex gap-1 border border-border p-1 bg-slate-50">
+            {(['all', 'low', 'medium', 'high'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPriorityFilter(p)}
+                className={`px-3 py-1.5 border border-border text-[10px] font-bold uppercase tracking-widest transition-none ${
+                  priorityFilter === p 
+                    ? 'bg-slate-400 text-white border-slate-500 z-10' 
+                    : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="ml-auto text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          Showing {filteredTasks.length} tasks
         </div>
       </div>
 
@@ -285,6 +356,16 @@ const TaskList: React.FC = () => {
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className={`font-bold text-sm tracking-tight ${task.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                     {task.text}
+                  </span>
+                  <span className={`px-1.5 py-0.5 text-[8px] font-black border uppercase tracking-widest flex items-center gap-1 ${
+                    task.priority === 'high' ? 'bg-red-50 text-red-600 border-red-100' :
+                    task.priority === 'medium' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                    'bg-emerald-50 text-emerald-600 border-emerald-100'
+                  }`}>
+                    {task.priority === 'high' && <AlertCircle size={8} />}
+                    {task.priority === 'medium' && <Clock size={8} />}
+                    {task.priority === 'low' && <CheckCircle size={8} />}
+                    {task.priority}
                   </span>
                   {task.patientName && (
                     <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[8px] font-bold border border-border uppercase flex items-center gap-1">

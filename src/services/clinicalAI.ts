@@ -1,13 +1,7 @@
-import { PatientData, MEWSState, SIRSState, QSOFAState, GCSState, Type } from '../types';
+import { PatientData, MEWSState, SIRSState, QSOFAState, GCSState, Type, SynthesisOptions } from '../types';
 import { ScoringEngine } from './scoringEngine';
 import { GoogleGenAI } from "@google/genai";
 import { MEDICAL_KNOWLEDGE } from './medicalKnowledge';
-
-export interface SynthesisOptions {
-  depth?: 'concise' | 'standard' | 'detailed';
-  focus?: 'diagnostic' | 'therapeutic' | 'educational';
-  includeHandover?: boolean;
-}
 
 export interface SynthesisResult {
   summary: string;
@@ -43,17 +37,21 @@ export class ClinicalSynthesizer {
         - Physical Exam: ${JSON.stringify(patientData.exam || {})}
         - Liver Findings: ${JSON.stringify(patientData.liver || {})}
         - Anthropometry: ${JSON.stringify(patientData.anthro || {})}
-        - Machine Data (Labs/Imaging): ${JSON.stringify(patientData.machineData || [])}
+        - Machine Data (Labs/Imaging/Medical Devices): ${JSON.stringify(patientData.machineData || [])}
         - Current Scores: MEWS=${patientData.mews.sbp ? 'Active' : 'N/A'}, GCS=${patientData.gcs.eye + patientData.gcs.verbal + patientData.gcs.motor}
+        - Other Scores: CURB-65: ${JSON.stringify(patientData.curb65)}, Wells PE: ${JSON.stringify(patientData.wellsPE)}, CHA2DS2-VASc: ${JSON.stringify(patientData.chads)}
         
         SPECIFIC INDICATION / REQUEST:
         ${customPrompt || "General clinical management based on available data."}
 
         INSTRUCTIONS:
         1. Recommend a list of medications with precise dosages, frequencies, and durations.
-        2. Provide a clinical rationale for each medication.
-        3. List critical safety warnings (contraindications, interactions, side effects).
-        4. Recommend a monitoring plan (labs, vitals, clinical signs).
+        2. Include drugs for Non-Communicable Diseases (NCDs) like Hypertension, Diabetes, and Chronic Respiratory diseases if relevant to the patient's data.
+        3. Provide a clinical rationale for each medication.
+        4. List critical safety warnings (contraindications, interactions, side effects).
+        5. Recommend a monitoring plan (labs, vitals, clinical signs).
+        6. For pediatric/neonate patients, ensure weight-based dosing (mg/kg).
+        7. For very large patients (up to 350kg), adjust dosages appropriately.
         
         FORMATTING RULES:
         - Use HIERARCHICAL OUTLINES with INDENTATION (4 spaces).
@@ -64,7 +62,6 @@ export class ClinicalSynthesizer {
         - Ensure a clean, professional, non-rendered appearance.
         
         CRITICAL: If the patient has liver dysfunction (Liver Findings), adjust dosages accordingly.
-        CRITICAL: If the patient is pediatric or neonate, ensure weight-based dosing (mg/kg) is specified.
       `;
 
       const response = await this.ai.models.generateContent({
@@ -128,7 +125,7 @@ MONITORING PLAN
     value: number,
     components: any,
     patientData: any,
-    options: SynthesisOptions = { depth: 'standard', focus: 'diagnostic', includeHandover: true }
+    options: SynthesisOptions = { depth: 'Standard', focus: 'Diagnostic', format: 'Standard', includeHandover: true, includeDifferential: true, includePrognosis: true }
   ): Promise<SynthesisResult> {
     // Check online status before attempting API call
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -137,9 +134,35 @@ MONITORING PLAN
     }
 
     try {
+      let priorityInstruction = "";
+      switch (scoreType) {
+        case 'GCS':
+          priorityInstruction = "PRIORITIZE NEUROLOGICAL STATUS: Analyze pupillary response, motor symmetry, and signs of intracranial pressure. Correlate with any head imaging in machineData.";
+          break;
+        case 'MEWS':
+        case 'PEWS':
+          priorityInstruction = "PRIORITIZE HEMODYNAMIC STABILITY: Analyze trends in heart rate, blood pressure, and perfusion. Look for signs of early shock or respiratory failure.";
+          break;
+        case 'qSOFA':
+        case 'SIRS':
+          priorityInstruction = "PRIORITIZE SEPSIS AND INFECTION: Analyze inflammatory markers, lactate levels, and source of infection. Evaluate organ dysfunction indicators.";
+          break;
+        case 'CURB-65':
+          priorityInstruction = "PRIORITIZE RESPIRATORY FUNCTION: Analyze oxygenation, urea levels, and chest imaging. Evaluate for severe pneumonia complications.";
+          break;
+        case 'Wells PE':
+          priorityInstruction = "PRIORITIZE THROMBOEMBOLIC RISK: Analyze D-dimer, leg symptoms, and risk factors for pulmonary embolism. Correlate with any CTPA or VQ scan data.";
+          break;
+        case 'CHA2DS2-VASc':
+          priorityInstruction = "PRIORITIZE STROKE RISK: Analyze age, hypertension, and vascular history to determine anticoagulation necessity.";
+          break;
+      }
+
       const prompt = `
         You are a senior clinical consultant and medical educator. Analyze the following patient data and provide a high-fidelity clinical synthesis.
         
+        ${priorityInstruction}
+
         PATIENT CONTEXT:
         - Age Group: ${patientData.ageGroup}
         - Clinical Notes: ${patientData.notes || "No additional context provided."}
@@ -148,7 +171,8 @@ MONITORING PLAN
         - Anthropometry: ${JSON.stringify(patientData.anthro || {})}
         - Surgical Context: ${JSON.stringify(patientData.surgery || {})}
         - Mental Health: PHQ-9=${JSON.stringify(patientData.phq9 || {})}, GAD-7=${JSON.stringify(patientData.gad7 || {})}, AMTS=${JSON.stringify(patientData.amts || {})}
-        - Machine Data (Labs/Imaging): ${JSON.stringify(patientData.machineData || [])}
+        - Machine Data (Labs/Imaging/Medical Devices): ${JSON.stringify(patientData.machineData || [])}
+        - Other Scores: CURB-65: ${JSON.stringify(patientData.curb65)}, Wells PE: ${JSON.stringify(patientData.wellsPE)}, CHA2DS2-VASc: ${JSON.stringify(patientData.chads)}
         
         PRIMARY SCORING DATA:
         - Score System: ${scoreType}
@@ -164,19 +188,24 @@ MONITORING PLAN
         SYNTHESIS OPTIONS:
         - Depth: ${options.depth}
         - Focus: ${options.focus}
+        - Format: ${options.format}
         - Include Handover: ${options.includeHandover}
+        - Include Differential Diagnoses: ${options.includeDifferential}
+        - Include Prognosis: ${options.includePrognosis}
 
         INSTRUCTIONS:
         1. Provide a nuanced clinical summary that interprets the score in the context of the patient's age and notes. 
-           - If depth is 'concise', keep it to 2-3 sentences.
-           - If depth is 'detailed', provide a comprehensive physiological rationale.
+           - Analyze data from medical devices (machineData) carefully.
+           - If depth is 'Concise', keep it to 2-3 sentences.
+           - If depth is 'Detailed', provide a comprehensive physiological rationale.
            - Focus primarily on ${options.focus} aspects.
         2. List immediate life-saving or stabilizing actions if necessary.
-           - CRITICAL: If riskLevel is 'High' or 'Critical', provide SPECIFIC, URGENT, and ACTIONABLE recommendations (e.g., specific drug doses, immediate surgical consult, rapid response activation).
-        3. Recommend a targeted diagnostic workup (Labs, Imaging, Monitoring).
+           - CRITICAL: If riskLevel is 'High' or 'Critical', provide SPECIFIC, URGENT, and ACTIONABLE recommendations.
+        3. Recommend a targeted diagnostic workup (Labs, Imaging, Monitoring) based on clinical findings and machine data.
         4. Provide evidence-based education points for the patient or their family.
-        5. Generate a professional, structured medical note (SBAR or SOAP format) suitable for a hospital handover if requested.
+        5. Generate a professional, structured medical note in ${options.format} format (e.g. SBAR or SOAP).
         6. Assign a risk level: 'Low', 'Moderate', 'High', or 'Critical'.
+        7. IF includeDifferential IS TRUE, INCLUDE A SECTION TITLED 'DIFFERENTIAL DIAGNOSES' WITH AT LEAST 3 POSSIBILITIES.
         
         FORMATTING RULES:
         - Use HIERARCHICAL OUTLINES with INDENTATION (4 spaces).
@@ -234,992 +263,139 @@ MONITORING PLAN
     let actions = "";
     let diagnostics = "";
     let education = "";
+    let documentation = "";
     let riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical' = 'Low';
-    let summary = `CLINICAL ANALYSIS LOCAL AI MODE
-
-
-SCORE TYPE
-    ${scoreType}
-
-
-CALCULATED VALUE
-    ${value}
-
-
-PATIENT CONTEXT
-    AGE GROUP ${patientData.ageGroup}
-    NOTES ${patientData.notes || 'NONE'}
-
-
-`;
-
-    const vitals = ScoringEngine.classifyVitals(
-      patientData.ageGroup,
-      components.hr || 0,
-      components.rr || 0,
-      components.sbp || 0
-    );
-
-    // Detailed Rule-Based Analysis
-    switch (scoreType) {
-      case 'MEWS':
-        if (value >= 5) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    THE PATIENTS MODIFIED EARLY WARNING SCORE MEWS OF ${value} INDICATES A SIGNIFICANT RISK OF CLINICAL DETERIORATION
-
-
-RECOMMENDATIONS
-    THIS THRESHOLD TYPICALLY REQUIRES IMMEDIATE ESCALATION TO A SENIOR MEDICAL OFFICER OR RAPID RESPONSE TEAM
-
-
-`;
-          actions += `IMMEDIATE ACTIONS
-    IMMEDIATE MEDICAL REVIEW BY A SENIOR CLINICIAN
-    CONSIDER RAPID RESPONSE TEAM OR ICU CONSULT
-    INCREASE MONITORING FREQUENCY TO EVERY 15 TO 30 MINUTES
-    ENSURE PATENT IV ACCESS
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    URGENT ARTERIAL BLOOD GAS
-    STAT 12 LEAD ECG AND CHEST XRAY
-    COMPREHENSIVE METABOLIC PANEL AND LACTATE
-
-
-`;
-        } else if (value >= 3) {
-          riskLevel = 'Moderate';
-          summary += `CLINICAL IMPRESSION
-    A MEWS SCORE OF ${value} SUGGESTS A MODERATE RISK
-
-
-RECOMMENDATIONS
-    INCREASED VIGILANCE AND CLINICAL REVIEW ARE RECOMMENDED TO IDENTIFY UNDERLYING CAUSES OF PHYSIOLOGICAL INSTABILITY
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    NOTIFY THE ATTENDING PHYSICIAN
-    INCREASE OBSERVATION FREQUENCY TO HOURLY
-    REVIEW FLUID BALANCE AND MEDICATION CHART
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    BASELINE BLOOD WORK
-    STRICT FLUID BALANCE MONITORING
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A MEWS SCORE OF ${value} INDICATES A LOW RISK
-
-
-RECOMMENDATIONS
-    THE PATIENT APPEARS PHYSIOLOGICALLY STABLE AT THIS TIME
-
-
-`;
-          actions += `ROUTINE ACTIONS
-    CONTINUE ROUTINE 4 HOURLY OBSERVATIONS
-    MAINTAIN STANDARD CARE PLAN
-
-
-`;
-        }
-        break;
-
-      case 'GCS':
-        if (value <= 8) {
-          riskLevel = 'Critical';
-          summary += `CLINICAL IMPRESSION
-    A GLASGOW COMA SCALE GCS OF ${value} INDICATES SEVERE NEUROLOGICAL IMPAIRMENT
-
-
-RECOMMENDATIONS
-    AT THIS LEVEL THE PATIENTS PROTECTIVE AIRWAY REFLEXES ARE LIKELY COMPROMISED
-
-
-`;
-          actions += `CRITICAL ACTIONS
-    URGENT SECURE AIRWAY
-    NEUROSURGICAL CONSULTATION STAT
-    MAINTAIN CERVICAL SPINE IMMOBILIZATION
-    IMPLEMENT NEURO PROTECTIVE MEASURES
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    STAT NON CONTRAST CT HEAD
-    MONITOR INTRACRANIAL PRESSURE
-    COMPREHENSIVE TOXICOLOGY SCREEN
-
-
-`;
-        } else if (value <= 12) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    A GCS OF ${value} INDICATES A MODERATE HEAD INJURY OR SIGNIFICANT ENCEPHALOPATHY
-
-
-RECOMMENDATIONS
-    CLOSE NEUROLOGICAL MONITORING IS ESSENTIAL TO DETEAR EARLY SIGNS OF HERNIATION
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    NEUROLOGICAL OBSERVATIONS EVERY 15 TO 30 MINUTES
-    NOTIFY NEUROSURGICAL OR NEUROLOGY TEAM
-    AVOID HYPOTENSION AND HYPOXIA
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    CT HEAD WITHIN 1 HOUR
-    FREQUENT GCS REASSESSMENT
-    CHECK ELECTROLYTES
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A GCS OF ${value} INDICATES A MILD HEAD INJURY
-
-
-RECOMMENDATIONS
-    ASSESS FOR POST CONCUSSIVE SYMPTOMS
-
-
-`;
-          actions += `ROUTINE ACTIONS
-    NEUROLOGICAL OBSERVATIONS HOURLY FOR 4 HOURS
-    ASSESS FOR POST CONCUSSIVE SYMPTOMS
-
-
-`;
-          education += `PATIENT EDUCATION
-    SIGNS OF INCREASING INTRACRANIAL PRESSURE
-    WHEN TO SEEK EMERGENCY CARE AFTER DISCHARGE
-
-
-`;
-        }
-        break;
-
-      case 'qSOFA':
-        if (value >= 2) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    A QUICK SOFA QSOFA SCORE OF ${value} IS HIGHLY PREDICTIVE OF SEPSIS RELATED MORTALITY
-
-
-RECOMMENDATIONS
-    THIS PATIENT MEETS THE CRITERIA FOR SUSPECTED SEPSIS WITH ORGAN DYSFUNCTION
-
-
-`;
-          actions += `SEPSIS PROTOCOL
-    INITIATE SEPSIS 6 PROTOCOL IMMEDIATELY
-    ADMINISTER BROAD SPECTRUM ANTIBIOTICS WITHIN 1 HOUR
-    AGGRESSIVE FLUID RESUSCITATION
-    OXYGEN THERAPY
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    BLOOD CULTURES BEFORE ANTIBIOTICS
-    SERIAL SERUM LACTATE LEVELS
-    PROCALCITONIN AND CRP
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    QSOFA SCORE IS ${value}
-
-
-RECOMMENDATIONS
-    WHILE NOT MEETING THE HIGH RISK THRESHOLD CLINICAL SUSPICION SHOULD REMAIN HIGH
-
-
-`;
-          actions += `MONITORING ACTIONS
-    MONITOR FOR SIGNS OF EMERGING ORGAN DYSFUNCTION
-    RE EVALUATE QSOFA FREQUENTLY
-    SCREEN FOR INFECTION SOURCES
-
-
-`;
-        }
-        break;
-
-      case 'SIRS':
-        if (value >= 2) {
-          riskLevel = 'Moderate';
-          summary += `CLINICAL IMPRESSION
-    THE PATIENT MEETS SYSTEMIC INFLAMMATORY RESPONSE SYNDROME SIRS CRITERIA SCORE ${value}
-
-
-RECOMMENDATIONS
-    THIS INDICATES A SIGNIFICANT SYSTEMIC INFLAMMATORY STATE
-
-
-`;
-          actions += `SIRS ACTIONS
-    SCREEN FOR POTENTIAL INFECTION
-    MONITOR VITALS CLOSELY
-    REVIEW WHITE CELL COUNT TRENDS
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    BLOOD CULTURES
-    URINALYSIS AND CXR
-    INFLAMMATORY MARKERS
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    SIRS SCORE IS ${value}
-
-
-RECOMMENDATIONS
-    NO SIGNIFICANT SYSTEMIC INFLAMMATORY RESPONSE DETECTED
-
-
-`;
-        }
-        break;
-
-      case 'PEWS':
-        if (value >= 5) {
-          riskLevel = 'Critical';
-          summary += `CLINICAL IMPRESSION
-    A PEDIATRIC EARLY WARNING SCORE PEWS OF ${value} IS A CRITICAL FINDING
-
-
-RECOMMENDATIONS
-    THERE IS A HIGH RISK OF RAPID RESPIRATORY OR CARDIOVASCULAR COLLAPSE
-
-
-`;
-          actions += `CRITICAL PEDIATRIC ACTIONS
-    IMMEDIATE PEDIATRIC RAPID RESPONSE ACTIVATION
-    START HIGH FLOW OXYGEN
-    SENIOR PEDIATRIC REGISTRAR REVIEW STAT
-    PREPARE FOR EMERGENCY AIRWAY MANAGEMENT
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    CAPILLARY OR ARTERIAL BLOOD GAS
-    CONTINUOUS MULTI PARAMETER MONITORING
-    STAT PORTABLE CHEST XRAY
-
-
-`;
-        } else if (value >= 3) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    A PEWS SCORE OF ${value} INDICATES SIGNIFICANT CLINICAL DISTRESS
-
-
-RECOMMENDATIONS
-    THIS REQUIRES URGENT ESCALATION AND FREQUENT REASSESSMENT
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    URGENT PEDIATRIC REVIEW WITHIN 30 MINS
-    INCREASE MONITORING FREQUENCY TO EVERY 30 TO 60 MINS
-    REVIEW BY SENIOR NURSING STAFF
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    PEWS SCORE IS ${value}
-
-
-RECOMMENDATIONS
-    THE PEDIATRIC PATIENT APPEARS STABLE
-
-
-`;
-          actions += `ROUTINE ACTIONS
-    CONTINUE ROUTINE PEDIATRIC OBSERVATIONS
-    ENSURE ADEQUATE HYDRATION
-
-
-`;
-        }
-        break;
-
-      case 'CURB-65':
-        if (value >= 3) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    A CURB 65 SCORE OF ${value} INDICATES SEVERE COMMUNITY ACQUIRED PNEUMONIA
-
-
-RECOMMENDATIONS
-    THIS PATIENT HAS A HIGH RISK OF MORTALITY AND TYPICALLY REQUIRES INPATIENT MANAGEMENT
-
-
-`;
-          actions += `PNEUMONIA ACTIONS
-    URGENT HOSPITAL ADMISSION
-    CONSIDER ICU HDU ADMISSION
-    START IV BROAD SPECTRUM ANTIBIOTICS IMMEDIATELY
-    ASSESS FOR SUPPLEMENTAL OXYGEN
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    CHEST XRAY
-    SPUTUM AND BLOOD CULTURES
-    URINARY ANTIGEN TESTS
-    UREA AND ELECTROLYTES
-
-
-`;
-        } else if (value === 2) {
-          riskLevel = 'Moderate';
-          summary += `CLINICAL IMPRESSION
-    A CURB 65 SCORE OF 2 INDICATES MODERATE SEVERITY PNEUMONIA
-
-
-RECOMMENDATIONS
-    SHORT STAY INPATIENT CARE OR VERY CLOSE OUTPATIENT FOLLOW UP IS WARRANTED
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    CONSIDER HOSPITAL BASED CARE
-    INITIATE APPROPRIATE ANTIBIOTIC THERAPY
-    MONITOR FOR CLINICAL IMPROVEMENT
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A CURB 65 SCORE OF ${value} INDICATES LOW SEVERITY PNEUMONIA
-
-
-RECOMMENDATIONS
-    CONSIDER HOME BASED TREATMENT WITH ORAL ANTIBIOTICS
-
-
-`;
-          actions += `ROUTINE ACTIONS
-    CONSIDER HOME BASED TREATMENT
-    PROVIDE CLEAR SAFETY NETTING INSTRUCTIONS
-
-
-`;
-        }
-        break;
-
-      case 'Wells PE':
-        if (value > 4) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    A WELLS SCORE OF ${value} INDICATES THAT PULMONARY EMBOLISM PE IS LIKELY
-
-
-RECOMMENDATIONS
-    DIAGNOSTIC IMAGING IS REQUIRED TO CONFIRM THE DIAGNOSIS
-
-
-`;
-          actions += `PE ACTIONS
-    INITIATE EMPIRICAL ANTICOAGULATION
-    URGENT SPECIALIST REVIEW
-    MONITOR FOR SIGNS OF RIGHT HEART STRAIN
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    CT PULMONARY ANGIOGRAM CTPA
-    VQ SCAN IF CTPA IS CONTRAINDICATED
-    BEDSIDE ECHOCARDIOGRAM
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A WELLS SCORE OF ${value} INDICATES THAT PULMONARY EMBOLISM IS UNLIKELY
-
-
-RECOMMENDATIONS
-    USE D DIMER TO RULE OUT PE
-
-
-`;
-          actions += `ROUTINE ACTIONS
-    USE D DIMER TO RULE OUT PE
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    HIGH SENSITIVITY D DIMER ASSAY
-
-
-`;
-        }
-        break;
-
-      case 'CHA₂DS₂-VASc':
-        if (value >= 2) {
-          riskLevel = 'Moderate';
-          summary += `CLINICAL IMPRESSION
-    A CHADS VASC SCORE OF ${value} INDICATES A HIGH RISK OF THROMBOEMBOLISM
-
-
-RECOMMENDATIONS
-    ORAL ANTICOAGULATION IS STRONGLY RECOMMENDED
-
-
-`;
-          actions += `AF ACTIONS
-    ORAL ANTICOAGULATION IS STRONGLY RECOMMENDED
-    REVIEW FOR BLEEDING RISK
-    OPTIMIZE BLOOD PRESSURE CONTROL
-
-
-`;
-        } else if (value === 1 && patientData.ageGroup !== 'Female') {
-          summary += `CLINICAL IMPRESSION
-    A CHADS VASC SCORE OF 1 INDICATES A MODERATE RISK OF STROKE
-
-
-RECOMMENDATIONS
-    CONSIDER ORAL ANTICOAGULATION BASED ON INDIVIDUAL FACTORS
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    CONSIDER ORAL ANTICOAGULATION
-    DISCUSS RISKS VS BENEFITS
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A CHADS VASC SCORE OF ${value} INDICATES A LOW RISK OF STROKE
-
-
-RECOMMENDATIONS
-    NO ANTITHROMBOTIC THERAPY OR ASPIRIN MAY BE CONSIDERED
-
-
-`;
-          actions += `ROUTINE ACTIONS
-    NO ANTITHROMBOTIC THERAPY
-    MANAGE MODIFIABLE RISK FACTORS
-
-
-`;
-        }
-        break;
-
-      case 'ARISCAT':
-        if (value >= 45) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    AN ARISCAT SCORE OF ${value} INDICATES A HIGH RISK OF POSTOPERATIVE RESPIRATORY COMPLICATIONS
-
-
-RECOMMENDATIONS
-    PRE OPERATIVE AND POST OPERATIVE OPTIMIZATION IS CRITICAL
-
-
-`;
-          actions += `ARISCAT ACTIONS
-    PRE OPERATIVE OPTIMIZATION OF RESPIRATORY STATUS
-    CONSIDER POST OPERATIVE ICU HDU ADMISSION
-    AGGRESSIVE CHEST PHYSIOTHERAPY
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    PRE OPERATIVE PULMONARY FUNCTION TESTS
-    BASELINE ABG
-
-
-`;
-        } else if (value >= 26) {
-          riskLevel = 'Moderate';
-          summary += `CLINICAL IMPRESSION
-    AN ARISCAT SCORE OF ${value} INDICATES AN INTERMEDIATE RISK OF COMPLICATIONS
-
-
-RECOMMENDATIONS
-    POST OPERATIVE INCENTIVE SPIROMETRY RECOMMENDED
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    POST OPERATIVE INCENTIVE SPIROMETRY
-    EARLY MOBILIZATION AND ADEQUATE ANALGESIA
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    AN ARISCAT SCORE OF ${value} INDICATES A LOW RISK OF POSTOPERATIVE RESPIRATORY COMPLICATIONS
-
-
-RECOMMENDATIONS
-    CONTINUE ROUTINE POST OPERATIVE CARE
-
-
-`;
-        }
-        break;
-
-      case 'PHQ-9':
-        if (value >= 15) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    A PHQ 9 SCORE OF ${value} INDICATES MODERATELY SEVERE TO SEVERE DEPRESSION
-
-
-RECOMMENDATIONS
-    IMMEDIATE CLINICAL EVALUATION FOR SAFETY AND TREATMENT PLANNING IS REQUIRED
-
-
-`;
-          actions += `MENTAL HEALTH ACTIONS
-    URGENT PSYCHIATRIC CONSULTATION
-    ASSESS FOR SUICIDAL IDEATION OR SELF HARM RISK
-    CONSIDER INITIATING ANTIDEPRESSANT THERAPY
-    REFER FOR INTENSIVE PSYCHOTHERAPY
-
-
-`;
-        } else if (value >= 10) {
-          riskLevel = 'Moderate';
-          summary += `CLINICAL IMPRESSION
-    A PHQ 9 SCORE OF ${value} INDICATES MODERATE DEPRESSION
-
-
-RECOMMENDATIONS
-    CLINICAL JUDGMENT SHOULD GUIDE TREATMENT DECISIONS INCLUDING THERAPY OR MEDICATION
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    MONITOR SYMPTOMS CLOSELY
-    CONSIDER COUNSELING OR PSYCHOTHERAPY
-    REVIEW TREATMENT PLAN IN 2 TO 4 WEEKS
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A PHQ 9 SCORE OF ${value} INDICATES MINIMAL TO MILD DEPRESSIVE SYMPTOMS
-
-
-RECOMMENDATIONS
-    CONTINUE MONITORING AS CLINICALLY INDICATED
-
-
-`;
-        }
-        break;
-
-      case 'GAD-7':
-        if (value >= 15) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    A GAD 7 SCORE OF ${value} INDICATES SEVERE ANXIETY
-
-
-RECOMMENDATIONS
-    ACTIVE TREATMENT AND CLOSE FOLLOW UP ARE RECOMMENDED
-
-
-`;
-          actions += `ANXIETY ACTIONS
-    CONSIDER PHARMACOTHERAPY SSRI OR SNRI
-    REFER FOR COGNITIVE BEHAVIORAL THERAPY CBT
-    ASSESS FOR CO MORBID DEPRESSION
-
-
-`;
-        } else if (value >= 10) {
-          riskLevel = 'Moderate';
-          summary += `CLINICAL IMPRESSION
-    A GAD 7 SCORE OF ${value} INDICATES MODERATE ANXIETY
-
-
-RECOMMENDATIONS
-    FURTHER EVALUATION AND POSSIBLE TREATMENT ARE WARRANTED
-
-
-`;
-          actions += `REQUIRED ACTIONS
-    CONSIDER COUNSELING
-    MONITOR FOR SYMPTOM PROGRESSION
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A GAD 7 SCORE OF ${value} INDICATES MINIMAL TO MILD ANXIETY
-
-
-RECOMMENDATIONS
-    REASSURANCE AND MONITORING
-
-
-`;
-        }
-        break;
-
-      case 'AMTS':
-        if (value < 7) {
-          riskLevel = 'High';
-          summary += `CLINICAL IMPRESSION
-    AN ABBREVIATED MENTAL TEST SCORE AMTS OF ${value} OUT OF 10 SUGGESTS COGNITIVE IMPAIRMENT
-
-
-RECOMMENDATIONS
-    FURTHER INVESTIGATION FOR DELIRIUM OR DEMENTIA IS REQUIRED
-
-
-`;
-          actions += `COGNITIVE ACTIONS
-    SCREEN FOR REVERSIBLE CAUSES OF CONFUSION INFECTION DEHYDRATION MEDICATION SIDE EFFECTS
-    CONSIDER FORMAL COGNITIVE ASSESSMENT MMSE OR MOCA
-    NOTIFY FAMILY AND ENSURE PATIENT SAFETY
-
-
-`;
-          diagnostics += `DIAGNOSTIC WORKUP
-    SCREEN FOR UTI AND OTHER INFECTIONS
-    REVIEW RECENT MEDICATION CHANGES
-    CHECK ELECTROLYTES AND B12 LEVELS
-
-
-`;
-        } else {
-          summary += `CLINICAL IMPRESSION
-    AN AMTS OF ${value} OUT OF 10 IS WITHIN THE NORMAL RANGE
-
-
-RECOMMENDATIONS
-    NO IMMEDIATE COGNITIVE CONCERNS IDENTIFIED
-
-
-`;
-        }
-        break;
-
-      default:
-        // Try to find knowledge from the database
-        const key = scoreType.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        const knowledge = (MEDICAL_KNOWLEDGE.scores as any)[key];
-        if (knowledge) {
-          summary += `CLINICAL IMPRESSION ${knowledge.name.toUpperCase()}
-    ${knowledge.description.toUpperCase()}
-
-
-`;
-          if (knowledge.recommendations) {
-            actions += `RECOMMENDATIONS
-    ${knowledge.recommendations.map((r: string) => r.toUpperCase()).join('\n    ')}
-
-
-`;
-          }
-          // Basic risk mapping if possible
-          if (knowledge.interpretation) {
-            const entry = knowledge.interpretation[value] || knowledge.interpretation[String(value)];
-            if (entry) {
-              summary += `INTERPRETATION
-    ${(entry.message || entry.risk || '').toUpperCase()} MORTALITY ${entry.mortality || 'NA'}
-
-
-`;
-              if (entry.risk) riskLevel = entry.risk as any;
-              if (entry.action) actions += `REQUIRED ACTION
-    ${entry.action.toUpperCase()}
-
-
-`;
-            }
-          }
-        } else {
-          summary += `CLINICAL IMPRESSION
-    A CLINICAL SCORE OF ${value} WAS CALCULATED USING THE ${scoreType} SYSTEM
-
-
-RECOMMENDATIONS
-    PLEASE INTERPRET THIS RESULT WITHIN THE BROADER CONTEXT OF THE PATIENT HISTORY
-
-
-`;
-        }
-    }
-
-    // Physical Exam Integration
-    if (patientData.exam) {
-      const { jvp, capRefill, skinTurgor, mucosa, pulseGrade, muscleStrength } = patientData.exam;
-      const liver = patientData.liver;
-
-      if (jvp > 8 || capRefill > 2 || skinTurgor !== 'Normal' || mucosa !== 'Moist' || pulseGrade < 2 || muscleStrength < 5 || (liver && (liver.ascites > 1 || liver.encephalopathy > 1))) {
-        summary += `GRANULAR PHYSICAL EXAM FINDINGS
-
-
-`;
-        
-        // Hemodynamic/Fluid Status
-        if (jvp > 8) {
-          summary += `    ELEVATED JVP ${jvp} MMHG
-        SUGGESTS CENTRAL VENOUS CONGESTION POTENTIALLY DUE TO RIGHT HEART FAILURE
-
-
-`;
-          actions += `HEMODYNAMIC ACTIONS
-    ASSESS FOR PERIPHERAL EDEMA
-    CONSIDER DIURETIC THERAPY
-
-
-`;
-        }
-        if (capRefill > 2) {
-          summary += `    PROLONGED CAPILLARY REFILL ${capRefill}S
-        INDICATES POOR PERIPHERAL TISSUE PERFUSION
-
-
-`;
-          actions += `PERFUSION ACTIONS
-    EVALUATE FOR OTHER SIGNS OF SHOCK
-
-
-`;
-        }
-        if (skinTurgor !== 'Normal' || mucosa !== 'Moist') {
-          summary += `    SIGNS OF DEHYDRATION
-        ${skinTurgor.toUpperCase()} SKIN TURGOR AND ${mucosa.toUpperCase()} MUCOSA SUGGEST VOLUME DEPLETION
-
-
-`;
-          actions += `FLUID ACTIONS
-    INITIATE APPROPRIATE FLUID RESUSCITATION
-    MONITOR URINE OUTPUT
-
-
-`;
-        }
-        
-        // Vascular/Neuromuscular
-        if (pulseGrade === 0) {
-          summary += `    ABSENT PULSES GRADE 0
-        CRITICAL FINDING SUGGESTING ACUTE LIMB ISCHEMIA
-
-
-`;
-          riskLevel = 'Critical';
-          actions = `URGENT ACTIONS
-    URGENT VASCULAR SURGERY CONSULT
-
-
-` + actions;
-        } else if (pulseGrade === 1) {
-          summary += `    WEAK THREADY PULSES GRADE 1
-        SUGGESTS LOW STROKE VOLUME
-
-
-`;
-        }
-        
-        if (muscleStrength < 3) {
-          summary += `    SIGNIFICANT MUSCLE WEAKNESS GRADE ${muscleStrength} OUT OF 5
-        PATIENT CANNOT MOVE AGAINST GRAVITY
-
-
-`;
-          actions += `NEUROMUSCULAR ACTIONS
-    CHECK ELECTROLYTES
-    CONSIDER NEUROLOGICAL IMAGING
-
-
-`;
-        } else if (muscleStrength < 5) {
-          summary += `    MILD MUSCLE WEAKNESS GRADE ${muscleStrength} OUT OF 5
-        REDUCED STRENGTH AGAINST RESISTANCE
-
-
-`;
-        }
-
-        // Liver specific findings
-        if (liver) {
-          if (liver.ascites > 1) {
-            summary += `    ASCITES ${liver.ascites === 2 ? 'MILD' : 'SEVERE'}
-        INDICATES PORTAL HYPERTENSION
-
-
-`;
-            diagnostics += `LIVER WORKUP
-    DIAGNOSTIC PARACENTESIS
-
-
-`;
-          }
-          if (liver.encephalopathy > 1) {
-            summary += `    HEPATIC ENCEPHALOPATHY GRADE ${liver.encephalopathy === 2 ? '1 TO 2' : '3 TO 4'}
-        SIGNIFICANT NEURO METABOLIC COMPLICATION
-
-
-`;
-            riskLevel = liver.encephalopathy === 3 ? 'Critical' : 'High';
-            actions += `ENCEPHALOPATHY ACTIONS
-    INITIATE LACTULOSE AND RIFAXIMIN
-    MONITOR AIRWAY
-
-
-`;
-          }
-        }
-
-        // Anthropometry Integration
-        if (patientData.anthro && patientData.anthro.height && (patientData.anthro.waist || patientData.anthro.weight)) {
-          const { waist, height, weight, hip } = patientData.anthro;
-          
-          if (waist && height) {
-            const ratio = Number(waist) / Number(height);
-            if (ratio > 0.5) {
-              summary += `    INCREASED CARDIOMETABOLIC RISK
-        WAIST TO HEIGHT RATIO IS ${ratio.toFixed(2)}
-
-
-`;
-              education += `METABOLIC EDUCATION
-    DISCUSS WEIGHT MANAGEMENT
-
-
-`;
-            }
-          }
-
-          if (weight && height) {
-            const bmi = ScoringEngine.calculateBMI(weight, height);
-            if (bmi) {
-              summary += `    BODY MASS INDEX BMI
-        ${bmi} KG PER M2
-
-
-`;
-              if (bmi >= 30) {
-                summary += `        PATIENT IS IN THE OBESE RANGE
-
-
-`;
-                riskLevel = riskLevel === 'Low' ? 'Moderate' : riskLevel;
-              } else if (bmi < 18.5) {
-                summary += `        PATIENT IS UNDERWEIGHT
-
-
-`;
-              }
-            }
-          }
-
-          if (waist && hip) {
-            const whr = ScoringEngine.calculateWHR(waist, hip);
-            if (whr) {
-              summary += `    WAIST TO HIP RATIO
-        ${whr}
-
-
-`;
-              if (whr > 0.9) {
-                summary += `        ELEVATED WHR INDICATES CENTRAL ADIPOSITY
-
-
-`;
-              }
-            }
-          }
-        }
+    
+    let summary = `CLINICAL ANALYSIS LOCAL AI MODE\n\n\n`;
+    summary += `SCORE TYPE: ${scoreType}\n`;
+    summary += `CALCULATED VALUE: ${value}\n`;
+    summary += `PATIENT CONTEXT: ${patientData.ageGroup}\n\n\n`;
+
+    // Rule-based logic for summary and risk
+    if (scoreType === 'MEWS') {
+      if (value >= 5) {
+        riskLevel = 'High';
+        summary += `CLINICAL IMPRESSION\n    THE MEWS SCORE OF ${value} INDICATES A HIGH RISK OF CLINICAL DETERIORATION. PHYSIOLOGICAL INSTABILITY IS EVIDENT.\n\n\n`;
+        actions += `IMMEDIATE ACTIONS\n    NOTIFY RAPID RESPONSE TEAM\n    INCREASE MONITORING TO EVERY 15 MINUTES\n    ENSURE IV ACCESS AND OXYGEN READINESS\n\n\n`;
+        diagnostics += `DIAGNOSTIC WORKUP\n    STAT ABG AND LACTATE\n    12 LEAD ECG\n    CHEST XRAY\n\n\n`;
+      } else if (value >= 3) {
+        riskLevel = 'Moderate';
+        summary += `CLINICAL IMPRESSION\n    MODERATE RISK DETECTED. PATIENT REQUIRES INCREASED CLINICAL VIGILANCE.\n\n\n`;
+        actions += `REQUIRED ACTIONS\n    NOTIFY ATTENDING PHYSICIAN\n    HOURLY VITAL SIGNS\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    LOW RISK. PATIENT APPEARS PHYSIOLOGICALLY STABLE.\n\n\n`;
+      }
+    } else if (scoreType === 'GCS') {
+      if (value <= 8) {
+        riskLevel = 'Critical';
+        summary += `CLINICAL IMPRESSION\n    CRITICAL NEUROLOGICAL IMPAIRMENT. GCS ${value} SUGGESTS INABILITY TO PROTECT AIRWAY.\n\n\n`;
+        actions += `CRITICAL ACTIONS\n    SECURE AIRWAY IMMEDIATELY\n    NEUROSURGICAL CONSULT STAT\n    NEUROPROTECTIVE MEASURES\n\n\n`;
+        diagnostics += `DIAGNOSTIC WORKUP\n    STAT CT HEAD NON CONTRAST\n    TOXICOLOGY SCREEN\n\n\n`;
+      } else if (value <= 12) {
+        riskLevel = 'High';
+        summary += `CLINICAL IMPRESSION\n    MODERATE NEUROLOGICAL DEFICIT. RISK OF RAPID DECLINE.\n\n\n`;
+        actions += `REQUIRED ACTIONS\n    NEURO-OBS EVERY 30 MINUTES\n    CT HEAD WITHIN 1 HOUR\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    MILD NEUROLOGICAL IMPAIRMENT.\n\n\n`;
+      }
+    } else if (scoreType === 'qSOFA' || scoreType === 'SIRS') {
+      if (value >= 2) {
+        riskLevel = 'High';
+        summary += `CLINICAL IMPRESSION\n    SUSPECTED SEPSIS OR SYSTEMIC INFLAMMATION. QSOFA/SIRS SCORE OF ${value} IS CONCERNING.\n\n\n`;
+        actions += `SEPSIS ACTIONS\n    INITIATE SEPSIS 6 PROTOCOL\n    START BROAD SPECTRUM ANTIBIOTICS\n    FLUID RESUSCITATION\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    LOW RISK FOR SEPSIS AT THIS TIME.\n\n\n`;
+      }
+    } else if (scoreType === 'CURB-65') {
+      if (value >= 3) {
+        riskLevel = 'High';
+        summary += `CLINICAL IMPRESSION\n    SEVERE COMMUNITY ACQUIRED PNEUMONIA. CURB-65 SCORE ${value}.\n\n\n`;
+        actions += `PNEUMONIA ACTIONS\n    URGENT HOSPITAL ADMISSION\n    IV ANTIBIOTICS\n\n\n`;
+      } else if (value >= 2) {
+        riskLevel = 'Moderate';
+        summary += `CLINICAL IMPRESSION\n    MODERATE SEVERITY PNEUMONIA.\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    LOW SEVERITY PNEUMONIA. CONSIDER OUTPATIENT CARE.\n\n\n`;
+      }
+    } else if (scoreType === 'Wells PE') {
+      if (value > 4) {
+        riskLevel = 'High';
+        summary += `CLINICAL IMPRESSION\n    PULMONARY EMBOLISM LIKELY. WELLS SCORE ${value}.\n\n\n`;
+        actions += `PE ACTIONS\n    INITIATE ANTICOAGULATION\n    URGENT IMAGING (CTPA)\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    PE UNLIKELY. USE D-DIMER TO RULE OUT.\n\n\n`;
+      }
+    } else if (scoreType === 'PHQ-9' || scoreType === 'GAD-7') {
+      if (value >= 15) {
+        riskLevel = 'High';
+        summary += `CLINICAL IMPRESSION\n    SEVERE SYMPTOMS DETECTED. SCORE ${value}.\n\n\n`;
+        actions += `MENTAL HEALTH ACTIONS\n    URGENT PSYCHIATRIC REVIEW\n    ASSESS FOR SELF HARM RISK\n\n\n`;
+      } else if (value >= 10) {
+        riskLevel = 'Moderate';
+        summary += `CLINICAL IMPRESSION\n    MODERATE SYMPTOMS DETECTED.\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    MILD OR MINIMAL SYMPTOMS.\n\n\n`;
+      }
+    } else if (scoreType === 'CHA2DS2-VASc') {
+      if (value >= 2) {
+        riskLevel = 'Moderate';
+        summary += `CLINICAL IMPRESSION\n    HIGH STROKE RISK IN ATRIAL FIBRILLATION. CHA2DS2-VASC SCORE ${value}.\n\n\n`;
+        actions += `AF ACTIONS\n    ORAL ANTICOAGULATION STRONGLY RECOMMENDED (DOAC OR WARFARIN)\n    REVIEW BLEEDING RISK (HAS-BLED)\n\n\n`;
+      } else if (value === 1) {
+        summary += `CLINICAL IMPRESSION\n    MODERATE STROKE RISK. CONSIDER ANTICOAGULATION BASED ON CLINICAL JUDGMENT.\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    LOW STROKE RISK. NO ANTICOAGULATION TYPICALLY REQUIRED.\n\n\n`;
+      }
+    } else if (scoreType === 'ARISCAT') {
+      if (value >= 45) {
+        riskLevel = 'High';
+        summary += `CLINICAL IMPRESSION\n    HIGH RISK OF POSTOPERATIVE RESPIRATORY COMPLICATIONS. SCORE ${value}.\n\n\n`;
+        actions += `SURGICAL ACTIONS\n    PRE-OP OPTIMIZATION\n    POST-OP ICU/HDU MONITORING\n    AGGRESSIVE CHEST PHYSIOTHERAPY\n\n\n`;
+      } else if (value >= 26) {
+        riskLevel = 'Moderate';
+        summary += `CLINICAL IMPRESSION\n    INTERMEDIATE RISK OF POST-OP RESPIRATORY COMPLICATIONS.\n\n\n`;
+      } else {
+        summary += `CLINICAL IMPRESSION\n    LOW RISK OF POST-OP RESPIRATORY COMPLICATIONS.\n\n\n`;
       }
     }
 
-    // Vital Sign Integration
-    if (vitals.hr.severity === 'Critical' || vitals.rr.severity === 'Critical' || vitals.sbp.severity === 'Critical') {
-      riskLevel = 'Critical';
-      summary += `HEMODYNAMIC ALERT
-    ONE OR MORE VITAL SIGNS ARE IN THE CRITICAL RANGE
-    PHYSIOLOGICAL STABILIZATION MUST BE THE IMMEDIATE PRIORITY
-
-
-`;
-      actions = `URGENT ACTIONS
-    URGENT STABILIZE VITAL SIGNS IMMEDIATELY
-
-
-` + actions;
+    // Add Differential Diagnoses if requested
+    if (options.includeDifferential) {
+      summary += `DIFFERENTIAL DIAGNOSES\n`;
+      if (scoreType === 'MEWS' || scoreType === 'PEWS' || scoreType === 'qSOFA' || scoreType === 'SIRS') {
+        summary += `    1 SEPSIS OR SEPTIC SHOCK\n    2 ACUTE CORONARY SYNDROME\n    3 PULMONARY EMBOLISM\n    4 HYPOVOLEMIA\n\n\n`;
+      } else if (scoreType === 'GCS') {
+        summary += `    1 INTRACRANIAL HEMORRHAGE\n    2 METABOLIC ENCEPHALOPATHY\n    3 TOXIC INGESTION\n    4 POST ICTAL STATE\n\n\n`;
+      } else if (scoreType === 'CURB-65') {
+        summary += `    1 BACTERIAL PNEUMONIA\n    2 VIRAL PNEUMONIA\n    3 CONGESTIVE HEART FAILURE\n    4 PULMONARY INFARCTION\n\n\n`;
+      } else {
+        summary += `    1 ACUTE INFECTION\n    2 ORGAN DYSFUNCTION\n    3 ELECTROLYTE IMBALANCE\n\n\n`;
+      }
     }
 
-    // Focus-specific adjustments
-    if (options.focus === 'educational') {
-      education += `GENERAL EDUCATION
-    ${this.getGeneralEducation(scoreType, riskLevel).map(e => e.toUpperCase()).join('\n    ')}
-
-
-`;
-    } else if (options.focus === 'therapeutic') {
-      actions += `THERAPEUTIC ACTIONS
-    REVIEW CURRENT MEDICATION LIST
-    OPTIMIZE PAIN MANAGEMENT
-
-
-`;
+    // Add Prognosis if requested
+    if (options.includePrognosis) {
+      summary += `PROGNOSIS\n`;
+      if (riskLevel === 'Critical' || riskLevel === 'High') {
+        summary += `    GUARDED PROGNOSIS REQUIRING INTENSIVE CARE INTERVENTION. HIGH RISK OF ADVERSE OUTCOME WITHOUT URGENT ESCALATION.\n\n\n`;
+      } else {
+        summary += `    FAVORABLE PROGNOSIS WITH CONTINUED MONITORING AND STANDARD TREATMENT.\n\n\n`;
+      }
     }
 
-    // Apply depth options to local summary
-    if (options.depth === 'concise') {
-      const lines = summary.split('\n\n');
-      summary = (lines[0] || '') + '\n\n' + (lines[1] || '');
-    } else if (options.depth === 'detailed') {
-      summary += `PHYSIOLOGICAL RATIONALE
-    THE CALCULATED ${scoreType} SCORE OF ${value} REFLECTS THE CUMULATIVE BURDEN OF PHYSIOLOGICAL DERANGEMENT
-    IN ${patientData.ageGroup.toUpperCase()} PATIENTS COMPENSATORY MECHANISMS MAY MASK EARLY DECLINE
-
-
-`;
+    // Documentation (SOAP/SBAR)
+    if (options.format === 'SOAP') {
+      documentation = `SOAP NOTE\n\nS: PATIENT PRESENTING WITH ${scoreType} OF ${value}. NOTES: ${patientData.notes || 'NONE'}.\nO: VITALS: HR ${components.hr || 'N/A'}, BP ${components.sbp || 'N/A'}, RR ${components.rr || 'N/A'}. EXAM: ${JSON.stringify(patientData.exam)}.\nA: ${riskLevel} RISK BASED ON ${scoreType}.\nP: ${actions.replace(/\n/g, ' ')}`;
+    } else {
+      documentation = `SBAR HANDOVER\n\nS: ${patientData.ageGroup} PATIENT WITH ${scoreType} ${value}.\nB: CLINICAL NOTES: ${patientData.notes || 'NONE'}.\nA: RISK LEVEL IS ${riskLevel}.\nR: RECOMMEND ${actions.replace(/\n/g, ' ')}`;
     }
 
     return {
       summary,
-      actions,
-      diagnostics,
-      education,
-      documentation: `LOCAL AI SYNTHESIS ${new Date().toLocaleString().toUpperCase()}
-
-
-SCORE
-    ${scoreType} EQUALS ${value}
-
-
-VITALS
-    HR ${components.hr} RR ${components.rr} BP ${components.sbp}
-
-
-RISK
-    ${riskLevel.toUpperCase()}
-
-
-MODE
-    OFFLINE LOCAL`,
+      actions: actions || "CONTINUE CURRENT MONITORING",
+      diagnostics: diagnostics || "ROUTINE LABS AND VITALS",
+      education: education || "EXPLAIN CLINICAL STATUS TO FAMILY",
+      documentation,
       riskLevel
     };
   }

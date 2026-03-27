@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { 
   Activity, Brain, Wind, Stethoscope, ShieldCheck, Moon, Sun, Calculator, AlertCircle, Eye, Zap,
-  Volume2, VolumeX, Info, X, Languages, Pill, Lock, Key
+  Volume2, VolumeX, Info, X, Languages, Pill, Lock, Key, Clock, Database, Mic, ChevronUp, ChevronDown
 } from 'lucide-react';
-import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, SurgicalState, PatientData, SavedPatient, Task, MachineData } from './types';
+import { GCSState, SIRSState, QSOFAState, MEWSState, LiverState, ExamState, SurgicalState, PatientData, SavedPatient, Task, MachineData, SynthesisOptions } from './types';
 import { BOTTOM_NAV_SECTIONS } from './constants';
 import ScoreCard from './components/ScoreCard';
-import { clinicalAI, SynthesisResult, SynthesisOptions } from './services/clinicalAI';
+import { clinicalAI, SynthesisResult } from './services/clinicalAI';
 import { ScoringEngine } from './services/scoringEngine';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import ScoreSummaryPanel from './components/ScoreSummaryPanel';
@@ -15,6 +15,7 @@ import { Save, FolderOpen, Trash2, UserPlus, CheckCircle2, AlertTriangle, CheckS
 import { useTranslation } from './contexts/TranslationContext';
 import { logger } from './services/logger';
 import { toast, Toaster } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'motion/react';
 
 import ReactMarkdown from 'react-markdown';
 import Screensaver from './components/Screensaver';
@@ -27,6 +28,7 @@ const PhysicalExam = lazy(() => import('./components/PhysicalExam'));
 const TaskList = lazy(() => import('./components/TaskList'));
 const MachineDataImport = lazy(() => import('./components/MachineDataImport'));
 const PrescriptionCalculator = lazy(() => import('./components/PrescriptionCalculator'));
+const ECGAnimation = lazy(() => import('./components/ECGAnimation'));
 
 const LoadingFallback = () => (
   <div className="flex flex-col items-center justify-center py-20 transition-none">
@@ -51,11 +53,108 @@ const App: React.FC = () => {
   const [activeRibbonTab, setActiveRibbonTab] = useState<'Home' | 'View' | 'Settings'>('Home');
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiInsight, setAiInsight] = useState<SynthesisResult | null>(null);
-  const [synthesisOptions, setSynthesisOptions] = useState<SynthesisOptions>({
-    depth: 'standard',
-    focus: 'diagnostic',
+  const [synthesisOptions, setSynthesisOptions] = useLocalStorage<SynthesisOptions>('ai-medica-synthesis-options', {
+    depth: 'Detailed',
+    focus: 'Clinical',
+    format: 'Standard',
+    includeDifferential: true,
+    includePrognosis: true,
     includeHandover: true
   });
+  const [isListening, setIsListening] = useState(false);
+  const [differentialExpanded, setDifferentialExpanded] = useState(false);
+
+  const parseDifferential = (text: string) => {
+    const sectionMatch = text.match(/DIFFERENTIAL DIAGNOSES\n([\s\S]*?)(?=\n\n\n|$)/i);
+    if (!sectionMatch) return null;
+    return sectionMatch[1].trim().split('\n').map(line => line.replace(/^\d+\s+/, '').trim()).filter(Boolean);
+  };
+
+  const handleVoiceCommand = () => {
+    const recognition = speechService.createRecognition({
+      onStart: () => {
+        setIsListening(true);
+        toast('Listening for commands...', { icon: '🎙️' });
+      },
+      onResult: (transcript) => {
+        const command = speechService.parseCommand(transcript) as { type: string; value?: any; field?: string } | null;
+        if (!command) {
+          toast.error(`Command not recognized: "${transcript}"`);
+          return;
+        }
+
+        switch (command.type) {
+          case 'NAVIGATE':
+            setActiveTab(command.value);
+            toast.success(`Navigating to ${command.value}`);
+            break;
+          case 'SET_DEPTH':
+            setSynthesisOptions(prev => ({ ...prev, depth: command.value }));
+            toast.success(`Depth set to ${command.value}`);
+            break;
+          case 'SET_FOCUS':
+            setSynthesisOptions(prev => ({ ...prev, focus: command.value }));
+            toast.success(`Focus set to ${command.value}`);
+            break;
+          case 'SET_FORMAT':
+            setSynthesisOptions(prev => ({ ...prev, format: command.value }));
+            toast.success(`Format set to ${command.value}`);
+            break;
+          case 'ADD_TASK':
+            const newTask: Task = {
+              id: Math.random().toString(36).substr(2, 9),
+              text: command.value,
+              completed: false,
+              priority: 'medium',
+              createdAt: new Date().toISOString()
+            };
+            setTasks([...tasks, newTask]);
+            toast.success(`Task added: ${command.value}`);
+            break;
+          case 'SET_WEIGHT':
+            setAnthro({ ...anthro, weight: command.value });
+            toast.success(`Weight set to ${command.value}kg`);
+            break;
+          case 'SET_PATIENT_NAME':
+            setPatientName(command.value);
+            toast.success(`Patient name set to ${command.value}`);
+            break;
+          case 'SET_EXAM':
+            setExam({ ...exam, [command.field]: command.value });
+            toast.success(`${command.field} set to ${command.value}`);
+            break;
+          case 'GENERATE_INSIGHT':
+            handleConsult();
+            break;
+          case 'STOP_SPEECH':
+            speechService.stop();
+            toast.success('Speech stopped');
+            break;
+          case 'TOGGLE_NIGHT_MODE':
+            toggleNightMode();
+            break;
+          case 'TOGGLE_EYE_COMFORT':
+            toggleEyeComfort();
+            break;
+          default:
+            toast.error('Command type not handled');
+        }
+      },
+      onError: () => {
+        setIsListening(false);
+        toast.error('Voice recognition error');
+      },
+      onEnd: () => {
+        setIsListening(false);
+      }
+    });
+
+    if (recognition) {
+      recognition.start();
+    } else {
+      toast.error('Voice commands not supported in this browser');
+    }
+  };
   const [consultTab, setConsultTab] = useState<'summary' | 'actions' | 'diagnostics' | 'education' | 'documentation'>('summary');
 
   // --- INACTIVITY LOGIC ---
@@ -220,6 +319,7 @@ const App: React.FC = () => {
     const [showSaveModal, setShowSaveModal] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [ecgRhythm, setEcgRhythm] = useState<'normal' | 'vtach' | 'atach' | 'vfib' | 'asystole'>('normal');
 
   const handleCopyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -323,7 +423,10 @@ const App: React.FC = () => {
       machineData,
       phq9,
       gad7,
-      amts
+      amts,
+      chads,
+      curb65,
+      wellsPE
     };
     
     try {
@@ -373,6 +476,7 @@ const App: React.FC = () => {
     if (newTasks.length > 0) {
       setTasks([...tasks, ...newTasks]);
       toast.success(`${newTasks.length} ${t('tasksAdded')}`);
+      speechService.speak(`${newTasks.length} tasks added to your clinical list.`);
       logGuestAction(`Added ${newTasks.length} tasks from AI insight`);
     }
   };
@@ -538,44 +642,34 @@ const App: React.FC = () => {
     };
   }, [isSplashing, isSpeechEnabled]);
 
-  if (isSplashing) {
-    return (
-      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white transition-none">
-        <div className="w-16 h-16 bg-slate-800 flex items-center justify-center shadow-none mb-5">
-          <Activity className="text-white" size={32} />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-800 uppercase">
-            AI <span className="text-primary">MEDICA</span>
-        </h1>
-        <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Clinical Intelligence</p>
-      </div>
-    );
-  }
-
   const renderContent = () => {
     switch (activeTab) {
       case 'calculators':
         return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between bg-white p-4 border border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-800">
-                  <Activity className="text-white" size={20} />
-                </div>
+          <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 rounded-2xl border border-border shadow-sm">
+              <div className="flex items-center gap-4">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('patientClassification')}</p>
-                  <p className="text-lg font-bold text-slate-900">{t(ageGroup.toLowerCase() as any)}</p>
+                  <h2 className="text-2xl font-bold tracking-tight text-foreground">{t('calculators')}</h2>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-1">Clinical Scoring & Risk Assessment</p>
                 </div>
+                <button 
+                  onClick={handleVoiceCommand}
+                  className="p-2 bg-muted text-muted-foreground hover:bg-accent border border-border rounded-xl transition-all"
+                  title="Voice Input"
+                >
+                  <Mic size={18} />
+                </button>
               </div>
-              <div className="flex gap-1 border border-border p-1 bg-slate-50">
+              <div className="flex bg-muted p-1 rounded-xl border border-border">
                 {(['Adult', 'Pediatric', 'Neonate'] as const).map((group) => (
                   <button
                     key={group}
                     onClick={() => handleAgeGroupChange(group)}
-                    className={`px-4 py-1.5 text-xs font-bold border border-border transition-none ${
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
                       ageGroup === group 
-                        ? 'bg-slate-400 text-white border-slate-500 z-10' 
-                        : 'bg-white text-slate-600 hover:bg-slate-50'
+                        ? 'bg-primary text-primary-foreground shadow-md' 
+                        : 'text-muted-foreground hover:bg-accent'
                     }`}
                   >
                     {t(group.toLowerCase() as any)}
@@ -604,141 +698,114 @@ const App: React.FC = () => {
               activeCalculator={activeCalculator}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <ScoreCard title="CHA₂DS₂-VASc" subtitle="Stroke Risk in AF" icon={<ShieldCheck size={20} />} score={ScoringEngine.calculateCHADS2VASc(chads)}>
-                <div className="grid grid-cols-1 gap-2">
-                  {[
-                    { key: 'chf', label: 'CHF / LV Dysfunction (1)' },
-                    { key: 'htn', label: 'Hypertension (1)' },
-                    { key: 'age75', label: 'Age ≥ 75 (2)' },
-                    { key: 'dm', label: 'Diabetes Mellitus (1)' },
-                    { key: 'stroke', label: 'Stroke/TIA/TE (2)' },
-                    { key: 'vascular', label: 'Vascular Disease (1)' },
-                    { key: 'age65', label: 'Age 65-74 (1)' },
-                    { key: 'female', label: 'Female Sex (1)' }
-                  ].map(item => (
-                    <div key={item.key} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200">
-                      <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{item.label}</span>
-                      <select 
-                        value={chads[item.key as keyof typeof chads] ? 'yes' : 'no'} 
-                        onChange={e => setChads({...chads, [item.key]: e.target.value === 'yes'})}
-                        className="p-1 bg-white border border-border font-bold text-xs outline-none focus:border-emerald-600"
-                      >
-                        <option value="no">No</option>
-                        <option value="yes">Yes</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </ScoreCard>
-
-              <ScoreCard title="CURB-65" subtitle="Pneumonia Severity" icon={<Wind size={20} />} score={ScoringEngine.calculateCURB65(curb65)}>
-                <div className="space-y-3">
-                  {Object.entries({ confusion: 'Confusion', urea: 'Urea > 7', rr: 'RR ≥ 30', bp: 'BP < 90/60', age: 'Age ≥ 65' }).map(([key, label]) => (
-                    <div key={key} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200">
-                      <span className="font-bold text-slate-700 text-sm">{label}</span>
-                      <select 
-                        value={curb65[key as keyof typeof curb65] ? 'yes' : 'no'} 
-                        onChange={e => setCurb65({...curb65, [key]: e.target.value === 'yes'})}
-                        className="p-1 bg-white border border-border font-bold text-xs outline-none focus:border-red-600"
-                      >
-                        <option value="no">No</option>
-                        <option value="yes">Yes</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </ScoreCard>
-              <ScoreCard title="Wells PE" subtitle="Pulmonary Embolism" icon={<Wind size={20}/>} score={ScoringEngine.calculateWellsPE(wellsPE)}>
-                  <div className="space-y-2">
-                      {Object.entries({ 
-                          dvtSymptoms: 'Clinical DVT Signs (3)', 
-                          peLikely: 'PE is #1 Diagnosis (3)', 
-                          hr100: 'HR > 100 bpm (1.5)',
-                          immobilization: 'Immob/Surgery (1.5)',
-                          priorDvtPe: 'Prior DVT/PE (1.5)',
-                          hemoptysis: 'Hemoptysis (1)',
-                          malignancy: 'Malignancy (1)'
-                      }).map(([key, label]) => (
-                          <div key={key} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200">
-                              <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{label}</span>
-                              <select 
-                                value={wellsPE[key as keyof typeof wellsPE] ? 'yes' : 'no'} 
-                                onChange={e => setWellsPE({...wellsPE, [key]: e.target.value === 'yes'})}
-                                className="p-1 bg-white border border-border font-bold text-xs outline-none focus:border-blue-600"
-                              >
-                                <option value="no">No</option>
-                                <option value="yes">Yes</option>
-                              </select>
-                          </div>
-                      ))}
-                  </div>
-              </ScoreCard>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Scores moved to Physical Exam */}
             </div>
           </div>
         );
       case 'prescription':
         return (
-          <Suspense fallback={<LoadingFallback />}>
-            <PrescriptionCalculator 
-              patientData={{
-                gcs, sirs, qsofa, mews, liver, exam, surgery, curb65, chads, pews, ageGroup, notes, anthro, machineData,
-                phq9, gad7, amts
-              }}
-              ageGroup={ageGroup}
-            />
-          </Suspense>
+          <div className="space-y-8">
+            <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                <Pill className="text-primary" /> {t('prescription')}
+              </h2>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-1">Dosing & Administration</p>
+            </div>
+            <Suspense fallback={<LoadingFallback />}>
+              <PrescriptionCalculator 
+                patientData={{
+                  gcs, sirs, qsofa, mews, liver, exam, surgery, curb65, chads, pews, ageGroup, notes, anthro, machineData,
+                  phq9, gad7, amts
+                }}
+                ageGroup={ageGroup}
+                onVoiceCommand={handleVoiceCommand}
+              />
+            </Suspense>
+          </div>
         );
       case 'exam':
         return (
-          <PhysicalExam 
-            exam={exam} setExam={setExam}
-            liver={liver} setLiver={setLiver}
-            anthro={anthro} setAnthro={setAnthro}
-          />
+          <div className="space-y-8">
+            <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                <Activity className="text-primary" /> {t('physicalExam')}
+              </h2>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-1">Clinical Findings & Anthropometry</p>
+            </div>
+            <PhysicalExam 
+              exam={exam} setExam={setExam}
+              liver={liver} setLiver={setLiver}
+              anthro={anthro} setAnthro={setAnthro}
+              chads={chads} setChads={setChads}
+              curb65={curb65} setCurb65={setCurb65}
+              wellsPE={wellsPE} setWellsPE={setWellsPE}
+              onVoiceCommand={handleVoiceCommand}
+            />
+          </div>
         );
       case 'patients':
         return (
-          <div className="space-y-6 transition-none">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 uppercase tracking-tight">
-                <FolderOpen className="text-primary" /> {t('savedPatients')}
-              </h2>
-              <button onClick={() => setActiveTab('calculators')} className="p-1.5 bg-white border border-border text-slate-600 hover:bg-slate-50 transition-none">
-                <UserPlus size={18} />
+          <div className="space-y-8">
+            <div className="flex items-center justify-between bg-card p-4 rounded-2xl border border-border shadow-sm">
+              <div className="flex items-center gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                    <FolderOpen className="text-primary" /> {t('savedPatients')}
+                  </h2>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-1">Clinical History & Records</p>
+                </div>
+                <button 
+                  onClick={handleVoiceCommand}
+                  className="p-2 bg-muted text-muted-foreground hover:bg-accent border border-border rounded-xl transition-all"
+                  title="Voice Input"
+                >
+                  <Mic size={18} />
+                </button>
+              </div>
+              <button 
+                onClick={() => setActiveTab('calculators')} 
+                className="p-3 bg-primary text-primary-foreground rounded-xl shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+              >
+                <UserPlus size={20} />
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {savedPatients.map(p => (
-                <div key={p.id} className="bg-white p-4 border border-border hover:border-primary transition-none group">
-                  <div className="flex justify-between items-start mb-3">
+                <motion.div 
+                  key={p.id} 
+                  whileHover={{ y: -4 }}
+                  className="bg-card p-5 rounded-2xl border border-border hover:border-primary/50 transition-all group shadow-sm hover:shadow-md"
+                >
+                  <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="text-base font-bold text-slate-800 uppercase tracking-tight">{p.name}</h3>
-                      <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-1">{p.serialNumber}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{new Date(p.date).toLocaleString()}</p>
+                      <h3 className="text-lg font-bold text-foreground leading-tight">{p.name}</h3>
+                      <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">{p.serialNumber}</p>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mt-1">{new Date(p.date).toLocaleString()}</p>
                     </div>
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[8px] font-bold border border-border uppercase">{t(p.ageGroup.toLowerCase() as any)}</span>
+                    <span className="px-2 py-1 bg-muted text-muted-foreground text-[9px] font-bold rounded-lg border border-border uppercase">{t(p.ageGroup.toLowerCase() as any)}</span>
                   </div>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => loadPatient(p)}
-                      className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[10px] font-bold border border-border transition-none uppercase tracking-widest"
+                      className="flex-1 py-2.5 bg-muted hover:bg-accent text-foreground text-[10px] font-bold rounded-xl border border-border transition-all uppercase tracking-widest"
                     >
                       {t('loadData')}
                     </button>
                     <button 
                       onClick={() => deletePatient(p.id)}
-                      className="p-1.5 bg-white hover:bg-red-50 text-red-600 border border-border hover:border-red-200 transition-none"
+                      className="p-2.5 bg-destructive/10 hover:bg-destructive text-destructive hover:text-destructive-foreground rounded-xl border border-destructive/20 transition-all"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
-                </div>
+                </motion.div>
               ))}
               {savedPatients.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-slate-50 border border-dashed border-border">
-                  <FolderOpen size={40} className="mx-auto text-slate-200 mb-3" />
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t('noSavedPatients')}</p>
+                <div className="col-span-full py-20 text-center bg-muted/30 rounded-3xl border-2 border-dashed border-border">
+                  <FolderOpen size={48} className="mx-auto text-muted-foreground/30 mb-4" />
+                  <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">{t('noSavedPatients')}</p>
                 </div>
               )}
             </div>
@@ -746,72 +813,121 @@ const App: React.FC = () => {
         );
       case 'tasks':
         return (
-          <div className="space-y-6 transition-none animate-slide-in">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 uppercase tracking-tight">
-                <CheckSquare className="text-primary" /> {t('clinicalTasks')}
-              </h2>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {tasks.filter(t => t.completed).length}/{tasks.length} {t('completed')}
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              {tasks.map(task => (
-                <div key={task.id} className={`p-4 border-2 transition-none flex items-start gap-4 ${task.completed ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-800 shadow-[4px_4px_0px_0px_rgba(30,41,59,1)]'}`}>
-                  <button 
-                    onClick={() => toggleTask(task.id)}
-                    className={`mt-1 w-5 h-5 border-2 flex items-center justify-center transition-none ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-800 hover:bg-slate-50'}`}
-                  >
-                    {task.completed && <Check size={14} />}
-                  </button>
-                  <div className="flex-1">
-                    <p className={`text-xs font-bold uppercase tracking-tight leading-relaxed ${task.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                      {task.text}
-                    </p>
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                        {new Date(task.createdAt).toLocaleString()}
-                      </span>
-                      {task.completedAt && (
-                        <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">
-                          {t('completedAt')}: {new Date(task.completedAt).toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => deleteTask(task.id)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 transition-none"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-              
-              {tasks.length === 0 && (
-                <div className="py-20 text-center bg-slate-50 border-2 border-dashed border-slate-200">
-                  <CheckSquare size={48} className="mx-auto text-slate-200 mb-4" />
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t('noTasks')}</p>
-                  <p className="text-[8px] text-slate-300 uppercase tracking-widest mt-1">{t('tasksHint')}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <Suspense fallback={<div className="flex items-center justify-center p-20"><Activity className="animate-pulse text-primary" /></div>}>
+            <TaskList 
+              tasks={tasks} 
+              setTasks={setTasks} 
+              patients={savedPatients} 
+            />
+          </Suspense>
         );
       case 'diagnostics':
         return (
-          <Suspense fallback={<LoadingFallback />}>
-            <MachineDataImport 
-              machineData={machineData}
-              onAddData={(data) => {
-                setMachineData([data, ...machineData]);
-                logGuestAction(`Added machine data: ${data.type} - ${data.interpretation || 'No interpretation'}`);
-              }}
-              onRemoveData={(id) => setMachineData(machineData.filter(d => d.id !== id))}
-              onClearAll={() => setMachineData([])}
-            />
-          </Suspense>
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Live Monitoring Section */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="bg-white border-4 border-slate-800 p-4 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)]">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Activity className="text-primary" size={20} />
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Real-Time Telemetry</h3>
+                    </div>
+                    <div className="flex gap-1">
+                      {(['normal', 'vtach', 'atach', 'vfib', 'asystole'] as const).map(r => (
+                        <button
+                          key={r}
+                          onClick={() => setEcgRhythm(r)}
+                          className={`px-2 py-1 text-[8px] font-black uppercase tracking-tighter border-2 transition-all ${
+                            ecgRhythm === r 
+                              ? 'bg-primary text-white border-primary shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]' 
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-primary'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ECGAnimation rhythm={ecgRhythm} onRhythmChange={(r) => setEcgRhythm(r as any)} />
+                  </Suspense>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                    {[
+                      { label: 'SpO2', value: '98', unit: '%', color: 'text-blue-600', trend: 'stable' },
+                      { label: 'Pulse', value: ecgRhythm === 'asystole' ? '0' : ecgRhythm === 'vtach' ? '160' : '72', unit: 'bpm', color: 'text-emerald-600', trend: 'up' },
+                      { label: 'NIBP', value: '120/80', unit: 'mmHg', color: 'text-slate-700', trend: 'stable' },
+                      { label: 'Temp', value: '36.8', unit: '°C', color: 'text-orange-600', trend: 'stable' }
+                    ].map((stat, i) => (
+                      <div key={i} className="p-3 bg-slate-50 border-2 border-slate-200 rounded-lg">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className={`text-xl font-black ${stat.color}`}>{stat.value}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{stat.unit}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white border-4 border-slate-800 p-4 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)]">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Database className="text-primary" size={20} />
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Diagnostic Data Import</h3>
+                  </div>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <MachineDataImport 
+                      machineData={machineData}
+                      onAddData={(data) => {
+                        setMachineData([data, ...machineData]);
+                        logGuestAction(`Added machine data: ${data.type} - ${data.interpretation || 'No interpretation'}`);
+                        toast.success(`Imported ${data.type} data`);
+                      }}
+                      onRemoveData={(id) => setMachineData(machineData.filter(d => d.id !== id))}
+                      onClearAll={() => setMachineData([])}
+                    />
+                  </Suspense>
+                </div>
+              </div>
+
+              {/* Diagnostic History & Analysis */}
+              <div className="space-y-4">
+                <div className="bg-white border-4 border-slate-800 p-4 shadow-[8px_8px_0px_0px_rgba(30,41,59,1)] h-full min-h-[400px]">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4">Device History</h3>
+                  {machineData.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                        <Database className="text-slate-300" size={24} />
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No device data imported yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {machineData.map((data, idx) => (
+                        <div key={idx} className="p-3 border-2 border-slate-200 rounded-lg hover:border-primary transition-colors group">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="px-2 py-0.5 bg-slate-100 text-[8px] font-black uppercase rounded">{data.type}</span>
+                            <span className="text-[8px] font-bold text-slate-400">{new Date(data.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-600 line-clamp-2 mb-2">{data.interpretation || 'Awaiting AI analysis...'}</p>
+                          <button 
+                            onClick={() => {
+                              setMachineData(machineData.filter((_, i) => i !== idx));
+                              toast.success('Record removed');
+                            }}
+                            className="text-[8px] font-black text-red-500 uppercase opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            Delete Record
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         );
       case 'summary':
         return (
@@ -833,6 +949,13 @@ const App: React.FC = () => {
                       <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
                          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2.5 m-0 uppercase tracking-tight">
                             <Stethoscope className="text-primary" size={20} /> {t('clinicalSynthesis')}
+                             <button 
+                               onClick={handleVoiceCommand}
+                               className="ml-2 p-1.5 bg-slate-50 text-slate-400 hover:text-slate-600 border border-border transition-all"
+                               title="Voice Input"
+                             >
+                               <Mic size={14} />
+                             </button>
                             {aiInsight.riskLevel && (
                               <span className={`px-1.5 py-0.5 border border-border text-[8px] font-bold uppercase tracking-widest ${
                                 aiInsight.riskLevel === 'Critical' ? 'bg-red-600 text-white' :
@@ -846,7 +969,7 @@ const App: React.FC = () => {
                          </h2>
                          <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1 border border-border bg-slate-50 p-1">
-                               {(['diagnostic', 'therapeutic', 'educational'] as const).map(f => (
+                               {(['Diagnostic', 'Therapeutic', 'Educational'] as const).map(f => (
                                  <button
                                    key={f}
                                    onClick={() => setSynthesisOptions({ ...synthesisOptions, focus: f })}
@@ -857,7 +980,7 @@ const App: React.FC = () => {
                                 ))}
                             </div>
                             <div className="flex items-center gap-1 border border-border bg-slate-50 p-1">
-                               {(['concise', 'standard', 'detailed'] as const).map(d => (
+                               {(['Concise', 'Standard', 'Detailed'] as const).map(d => (
                                  <button
                                    key={d}
                                    onClick={() => setSynthesisOptions({ ...synthesisOptions, depth: d })}
@@ -867,7 +990,45 @@ const App: React.FC = () => {
                                  </button>
                                 ))}
                             </div>
-                            <div className="flex items-center gap-3">
+                             <div className="flex items-center gap-1 border border-border bg-slate-50 p-1">
+                                {(['Standard', 'SBAR', 'SOAP'] as const).map(fmt => (
+                                  <button
+                                    key={fmt}
+                                    onClick={() => setSynthesisOptions({ ...synthesisOptions, format: fmt })}
+                                    className={`px-3 py-1.5 text-[8px] font-bold uppercase tracking-tight border border-border transition-none ${synthesisOptions.format === fmt ? 'bg-slate-400 text-white border-slate-500 z-10' : 'text-slate-400 hover:text-slate-600'}`}
+                                  >
+                                    {fmt}
+                                  </button>
+                                 ))}
+                             </div>
+                             <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 border border-border">
+                                <label className="flex items-center gap-1.5 cursor-pointer">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={synthesisOptions.includeDifferential} 
+                                    onChange={e => setSynthesisOptions({...synthesisOptions, includeDifferential: e.target.checked})}
+                                    className="w-3 h-3 accent-primary"
+                                  />
+                                  <span className="text-[8px] font-bold uppercase text-slate-600">Differential</span>
+                                </label>
+                                <label className="flex items-center gap-1.5 cursor-pointer">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={synthesisOptions.includePrognosis} 
+                                    onChange={e => setSynthesisOptions({...synthesisOptions, includePrognosis: e.target.checked})}
+                                    className="w-3 h-3 accent-primary"
+                                  />
+                                  <span className="text-[8px] font-bold uppercase text-slate-600">Prognosis</span>
+                                </label>
+                             </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                               <button 
+                                 onClick={handleVoiceCommand}
+                                 className={`p-1.5 border-2 transition-all flex items-center justify-center ${isListening ? 'bg-red-600 text-white border-red-600 animate-pulse' : 'bg-white text-slate-800 border-slate-800 hover:bg-slate-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}
+                                 title="Voice Commands"
+                               >
+                                 <Mic size={14} />
+                               </button>
                                <button 
                                  onClick={() => {
                                    if (!aiInsight) return;
@@ -920,42 +1081,80 @@ Diagnostics: ${aiInsight.diagnostics}
 
                       <div className="clinical-text text-slate-700 whitespace-pre-wrap leading-relaxed text-xs flex-1 overflow-y-auto custom-scrollbar">
                           {consultTab === 'summary' && (
-                            <div className="p-4 bg-slate-50 border border-border max-w-none">
-                              <div className="prose prose-slate prose-xs max-w-none text-slate-800">
-                                <ReactMarkdown>{aiInsight.summary}</ReactMarkdown>
+                            <div className="flex flex-col gap-4">
+                              {aiInsight.summary.includes('DIFFERENTIAL DIAGNOSES') && (
+                                <div className="bg-amber-50 border-2 border-amber-200 p-3 shadow-[4px_4px_0px_0px_rgba(251,191,36,0.1)]">
+                                  <button 
+                                    onClick={() => setDifferentialExpanded(!differentialExpanded)}
+                                    className="w-full flex justify-between items-center text-[10px] font-black text-amber-800 uppercase tracking-widest"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <AlertCircle size={14} />
+                                      <span>Differential Diagnoses</span>
+                                    </div>
+                                    {differentialExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                  </button>
+                                  {differentialExpanded && (
+                                    <div className="mt-3 grid grid-cols-1 gap-2">
+                                      {parseDifferential(aiInsight.summary)?.map((diff, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 p-2 bg-white border border-amber-200 text-[10px] font-bold text-slate-700 uppercase tracking-tight">
+                                          <div className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                                          {diff}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <div className="p-4 bg-slate-50 border border-border max-w-none">
+                                <div className="prose prose-slate prose-xs max-w-none text-slate-800">
+                                  <ReactMarkdown>{aiInsight.summary}</ReactMarkdown>
+                                </div>
                               </div>
                             </div>
                           )}
                           {consultTab === 'actions' && (
                             <div className="p-4 bg-white border border-border">
-                              <div className="flex justify-end mb-2">
-                                <button 
-                                  onClick={() => addTaskFromInsight(aiInsight.actions)}
-                                  className="px-2 py-1 bg-slate-800 text-white text-[8px] font-bold uppercase tracking-widest border border-slate-800 hover:bg-slate-700 transition-none flex items-center gap-1"
-                                >
-                                  <Plus size={10} /> {t('addToTasks')}
-                                </button>
+                              <div className="flex flex-col gap-4">
+                                <div className="flex justify-between items-center bg-slate-50 p-3 border border-border rounded-lg">
+                                  <div>
+                                    <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Suggested Tasks</h4>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">AI-generated clinical recommendations</p>
+                                  </div>
+                                  <button 
+                                    onClick={() => addTaskFromInsight(aiInsight.actions)}
+                                    className="px-3 py-1.5 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest border border-slate-800 hover:bg-slate-700 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                                  >
+                                    <Plus size={12} /> {t('addAllSuggestions')}
+                                  </button>
+                                </div>
+                                <div className="prose prose-slate prose-xs max-w-none text-slate-800">
+                                  <ReactMarkdown>{aiInsight.actions}</ReactMarkdown>
+                                </div>
+                                {!aiInsight.actions && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noActions')}</p>}
                               </div>
-                              <div className="prose prose-slate prose-xs max-w-none text-slate-800">
-                                <ReactMarkdown>{aiInsight.actions}</ReactMarkdown>
-                              </div>
-                              {!aiInsight.actions && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noActions')}</p>}
                             </div>
                           )}
                           {consultTab === 'diagnostics' && (
                             <div className="p-4 bg-white border border-border">
-                              <div className="flex justify-end mb-2">
-                                <button 
-                                  onClick={() => addTaskFromInsight(aiInsight.diagnostics)}
-                                  className="px-2 py-1 bg-slate-800 text-white text-[8px] font-bold uppercase tracking-widest border border-slate-800 hover:bg-slate-700 transition-none flex items-center gap-1"
-                                >
-                                  <Plus size={10} /> {t('addToTasks')}
-                                </button>
+                              <div className="flex flex-col gap-4">
+                                <div className="flex justify-between items-center bg-slate-50 p-3 border border-border rounded-lg">
+                                  <div>
+                                    <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Diagnostic Workup</h4>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Recommended investigations</p>
+                                  </div>
+                                  <button 
+                                    onClick={() => addTaskFromInsight(aiInsight.diagnostics)}
+                                    className="px-3 py-1.5 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest border border-slate-800 hover:bg-slate-700 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                                  >
+                                    <Plus size={12} /> {t('addWorkupToTasks')}
+                                  </button>
+                                </div>
+                                <div className="prose prose-slate prose-xs max-w-none text-slate-800">
+                                  <ReactMarkdown>{aiInsight.diagnostics}</ReactMarkdown>
+                                </div>
+                                {!aiInsight.diagnostics && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noDiagnostics')}</p>}
                               </div>
-                              <div className="prose prose-slate prose-xs max-w-none text-slate-800">
-                                <ReactMarkdown>{aiInsight.diagnostics}</ReactMarkdown>
-                              </div>
-                              {!aiInsight.diagnostics && <p className="text-slate-400 italic p-6 text-center uppercase tracking-widest text-[9px]">{t('noDiagnostics')}</p>}
                             </div>
                           )}
                           {consultTab === 'education' && (
@@ -980,13 +1179,34 @@ Diagnostics: ${aiInsight.diagnostics}
                    </div>
                  )}
               </div>
-              <div className="bg-white p-3 border border-border transition-none">
+              <div className="bg-white p-3 border border-border transition-none relative">
                 <textarea 
                   value={notes} 
                   onChange={e => setNotes(e.target.value)} 
                   placeholder={t('addCaseNotes')} 
-                  className="w-full h-20 bg-white border border-border p-3 text-slate-800 outline-none focus:bg-slate-50 transition-none font-medium text-xs"
+                  className="w-full h-20 bg-white border border-border p-3 text-slate-800 outline-none focus:bg-slate-50 transition-none font-medium text-xs pr-10"
                 />
+                <button 
+                  onClick={() => {
+                    const recognition = speechService.createRecognition({
+                      onStart: () => toast('Listening for notes...', { icon: '🎙️' }),
+                      onResult: (transcript) => {
+                        setNotes(notes ? notes + ' ' + transcript : transcript);
+                        toast.success('Notes updated');
+                      },
+                      onError: () => toast.error('Voice recognition error')
+                    });
+                    if (recognition) {
+                      recognition.start();
+                    } else {
+                      toast.error('Voice recognition not supported');
+                    }
+                  }}
+                  className="absolute right-5 bottom-5 p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 border border-border transition-none"
+                  title="Voice Input for Notes"
+                >
+                  <Mic size={14} />
+                </button>
               </div>
             </div>
         );
@@ -1227,163 +1447,178 @@ Diagnostics: ${aiInsight.diagnostics}
         </div>
       )}
 
-        {/* Desktop Title Bar */}
-        <div className="bg-slate-800 px-3 py-1.5 flex items-center justify-between select-none">
-          <div className="flex items-center gap-2">
-            <Activity className="text-emerald-400" size={14} />
-            <span className="text-[10px] font-black text-white uppercase tracking-widest">
-              {t('appName')} - <span className="text-slate-400 font-medium">Clinical Workstation v2.5</span>
+      <AnimatePresence>
+        {isSplashing && (
+          <motion.div 
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-6 text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="w-24 h-24 bg-primary/20 rounded-3xl flex items-center justify-center mb-8 border border-primary/30"
+            >
+              <Activity size={48} className="text-primary animate-pulse" />
+            </motion.div>
+            <motion.h1 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-4xl font-bold text-white tracking-tighter mb-2"
+            >
+              AI Medica <span className="text-primary">UG</span>
+            </motion.h1>
+            <motion.p 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-slate-400 text-sm font-medium uppercase tracking-[0.3em]"
+            >
+              Clinical Decision Support
+            </motion.p>
+            <div className="mt-12 w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
+              <motion.div 
+                initial={{ x: '-100%' }}
+                animate={{ x: '100%' }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                className="w-full h-full bg-primary shadow-[0_0_15px_rgba(37,99,235,0.5)]"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {isInactive && (
+        <Screensaver onWake={() => setIsInactive(false)} />
+      )}
+
+      {/* Modern Header */}
+      <header className="glass-panel sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+            <Activity size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-foreground leading-none">AI Medica <span className="text-primary">UG</span></h1>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Clinical Engine v2.5</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1 px-3 py-1.5 bg-muted rounded-full border border-border">
+            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {isOnline ? t('online') : t('offline')}
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-4 mr-4">
-              <div className="flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                <span className="text-[8px] font-black uppercase tracking-widest text-slate-300">
-                  {isOnline ? t('cloudAiActive') : t('localAiActive')}
-                </span>
-              </div>
-              {isGuestMode && (
-                <span className="text-[8px] font-black uppercase tracking-widest text-red-400 animate-pulse">
-                  Guest Mode
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-amber-600 cursor-pointer hover:brightness-110" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-emerald-600 cursor-pointer hover:brightness-110" />
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500 border border-red-600 cursor-pointer hover:brightness-110" />
-            </div>
-          </div>
+          
+          <button 
+            onClick={() => setIsNightMode(!isNightMode)}
+            className="p-2 rounded-full hover:bg-muted transition-colors text-muted-foreground"
+          >
+            {isNightMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          
+          <button 
+            onClick={() => setLanguage(language === 'en' ? 'sw' : 'en')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border hover:bg-accent transition-colors"
+          >
+            <Languages size={14} className="text-primary" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">{language.toUpperCase()}</span>
+          </button>
         </div>
+      </header>
 
-        {/* Desktop Menu Bar */}
-        <div className="bg-slate-100 border-b border-slate-200 px-2 py-0.5 flex items-center gap-1">
-          {(['Home', 'View', 'Settings'] as const).map(tab => (
-            <button 
-              key={tab}
-              onClick={() => setActiveRibbonTab(tab)}
-              className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition-all rounded-sm ${activeRibbonTab === tab ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Sidebar Navigation (Desktop) */}
+        <nav className="hidden md:flex flex-col w-20 bg-card border-r border-border p-3 gap-4">
+          {[
+            { id: 'calculators', icon: <Calculator size={20} />, label: t('calculators') },
+            { id: 'exam', icon: <Stethoscope size={20} />, label: t('exam') },
+            { id: 'diagnostics', icon: <Activity size={20} />, label: t('diagnostics') },
+            { id: 'summary', icon: <Brain size={20} />, label: 'Synthesis' },
+            { id: 'prescription', icon: <Pill size={20} />, label: 'Dosing' },
+            { id: 'tasks', icon: <CheckSquare size={20} />, label: t('tasks') },
+            { id: 'patients', icon: <FolderOpen size={20} />, label: t('records') },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all ${
+                activeTab === item.id 
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' 
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
             >
-              {tab}
+              {item.icon}
+              <span className="text-[8px] font-bold uppercase tracking-wider">{item.label}</span>
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-2 pr-2">
-            <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date().toLocaleDateString()}</span>
+        </nav>
+
+        {/* Content View */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+          <div className="max-w-6xl mx-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
-
-        {/* Desktop Toolbar (Unified Header) */}
-        <header className="app-toolbar bg-white border-b border-slate-200 p-1.5 flex items-center gap-4 overflow-x-auto no-scrollbar">
-          {activeRibbonTab === 'Home' && (
-            <>
-              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
-                {[
-                  ...BOTTOM_NAV_SECTIONS, 
-                  { id: 'patients', name: t('records'), icon: <FolderOpen size={14} className="text-blue-400" /> }
-                ].map((s) => (
-                  <button 
-                    key={s.id} 
-                    onClick={() => setActiveTab(s.id)} 
-                    className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${activeTab === s.id ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-700'}`}
-                  >
-                    {s.icon}
-                    <span className="text-[7px] font-bold uppercase mt-0.5">{s.name}</span>
-                  </button>
-                ))}
-                <button 
-                  onClick={() => setActiveTab('prescription')} 
-                  className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${activeTab === 'prescription' ? 'bg-emerald-600 text-white shadow-inner' : 'text-slate-700'}`}
-                >
-                  <Calculator size={14} className={activeTab === 'prescription' ? 'text-white' : 'text-emerald-500'} />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Synthesis</span>
-                </button>
-              </div>
-
-              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
-                <button onClick={() => setShowSaveModal(true)} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
-                  <Save size={14} className="text-blue-600" />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">{t('save')}</span>
-                </button>
-                <button onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isSpeechEnabled ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
-                  {isSpeechEnabled ? <Volume2 size={14} className="text-emerald-400" /> : <VolumeX size={14} className="text-slate-400" />}
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Speech</span>
-                </button>
-                <button onClick={handleAboutPress} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
-                  <Info size={14} className="text-blue-500" />
-                  <span className="text-[7px] font-black uppercase mt-0.5">About</span>
-                </button>
-              </div>
-            </>
-          )}
-
-          {activeRibbonTab === 'View' && (
-            <>
-              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
-                <button onClick={toggleNightMode} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isNightMode ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
-                  {isNightMode ? <Sun size={14} className="text-amber-500" /> : <Moon size={14} className="text-slate-400" />}
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Night Mode</span>
-                </button>
-                <button onClick={toggleEyeComfort} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isEyeComfort ? 'bg-emerald-500 text-white' : 'text-slate-700'}`}>
-                  <Eye size={14} className={isEyeComfort ? 'text-white' : 'text-emerald-500'} />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Comfort</span>
-                </button>
-              </div>
-              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
-                <button onClick={() => setIsSpeechEnabled(true)} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${isSpeechEnabled ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
-                  <Volume2 size={14} className={isSpeechEnabled ? 'text-white' : 'text-blue-500'} />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Voice On</span>
-                </button>
-                <button onClick={() => setIsSpeechEnabled(false)} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${!isSpeechEnabled ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
-                  <VolumeX size={14} className={!isSpeechEnabled ? 'text-white' : 'text-slate-400'} />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Voice Off</span>
-                </button>
-              </div>
-            </>
-          )}
-
-          {activeRibbonTab === 'Settings' && (
-            <>
-              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
-                <button onClick={() => setLanguage('en')} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${language === 'en' ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
-                  <Languages size={14} className={language === 'en' ? 'text-white' : 'text-blue-500'} />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">English</span>
-                </button>
-                <button onClick={() => setLanguage('sw')} className={`toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 transition-all ${language === 'sw' ? 'bg-slate-800 text-white' : 'text-slate-700'}`}>
-                  <Languages size={14} className={language === 'sw' ? 'text-white' : 'text-red-500'} />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Swahili</span>
-                </button>
-              </div>
-              <div className="toolbar-group flex items-center gap-1 pr-4 border-r border-slate-100">
-                <button onClick={() => setShowPasswordChange(true)} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
-                  <Lock size={14} className="text-slate-800" />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Security</span>
-                </button>
-                <button onClick={readLogs} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-slate-100 text-slate-700">
-                  <ShieldCheck size={14} className="text-red-600" />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Logs</span>
-                </button>
-                <button onClick={handleLogout} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-red-50 text-slate-700">
-                  <X size={14} className="text-red-500" />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Logout</span>
-                </button>
-                <button onClick={() => {
-                  setSavedPatients([]);
-                  logGuestAction('Cleared all patient records from the database');
-                }} className="toolbar-button flex flex-col items-center justify-center min-w-[48px] p-1 rounded hover:bg-red-50 text-slate-700">
-                  <Trash2 size={14} className="text-red-500" />
-                  <span className="text-[7px] font-bold uppercase mt-0.5">Reset</span>
-                </button>
-              </div>
-            </>
-          )}
-        </header>
-
-      <main className="flex-1 overflow-y-auto bg-slate-50 p-4">
-        <div className="bg-white border border-slate-200 shadow-sm rounded-md min-h-full p-6">
-          {renderContent()}
-        </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden glass-panel border-t border-border px-2 py-2 flex items-center justify-around">
+        {[
+          { id: 'calculators', icon: <Calculator size={20} />, label: t('calculators') },
+          { id: 'exam', icon: <Stethoscope size={20} />, label: t('exam') },
+          { id: 'diagnostics', icon: <Activity size={20} />, label: t('diagnostics') },
+          { id: 'summary', icon: <Brain size={20} />, label: 'AI' },
+          { id: 'prescription', icon: <Pill size={20} />, label: 'Dosing' },
+          { id: 'tasks', icon: <CheckSquare size={20} />, label: t('tasks') },
+          { id: 'patients', icon: <FolderOpen size={20} />, label: t('records') },
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${
+              activeTab === item.id 
+                ? 'text-primary' 
+                : 'text-muted-foreground'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-primary/10' : ''}`}>
+              {item.icon}
+            </div>
+            <span className="text-[8px] font-bold uppercase tracking-wider">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Floating Global Voice Command Button */}
+      {isAuthorized && (
+        <button
+          onClick={handleVoiceCommand}
+          className={`fixed bottom-24 right-6 z-[100] w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-110 active:scale-95 ${
+            isListening 
+              ? 'bg-red-600 text-white animate-pulse ring-4 ring-red-200' 
+              : 'bg-slate-800 text-white border-2 border-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+          }`}
+          title="Global Voice Command"
+        >
+          <Mic size={24} />
+        </button>
+      )}
 
       <Toaster position="top-right" />
     </div>
