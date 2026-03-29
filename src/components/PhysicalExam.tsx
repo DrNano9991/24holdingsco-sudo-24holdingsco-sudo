@@ -3,6 +3,7 @@ import { User, Droplets, Brain, Ruler, Activity, Thermometer, ShieldCheck, Wind,
 import ScoreCard from './ScoreCard';
 import { ExamState, LiverState, CHADS2VAScState, CURB65State } from '../types';
 import { ScoringEngine } from '../services/scoringEngine';
+import { speechService } from '../services/speechService';
 
 interface PhysicalExamProps {
   exam: ExamState;
@@ -17,6 +18,12 @@ interface PhysicalExamProps {
   setCurb65: (curb65: CURB65State) => void;
   wellsPE: any;
   setWellsPE: (wellsPE: any) => void;
+  phq9: any;
+  setPhq9: (phq9: any) => void;
+  gad7: any;
+  setGad7: (gad7: any) => void;
+  amts: any;
+  setAmts: (amts: any) => void;
   onVoiceCommand?: () => void;
 }
 
@@ -27,10 +34,25 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
   chads, setChads,
   curb65, setCurb65,
   wellsPE, setWellsPE,
+  phq9, setPhq9,
+  gad7, setGad7,
+  amts, setAmts,
   onVoiceCommand
 }) => {
   const bmi = (anthro.weight && anthro.height) ? (Number(anthro.weight) / Math.pow(Number(anthro.height) / 100, 2)).toFixed(1) : null;
   const whr = (anthro.waist && anthro.hip) ? (Number(anthro.waist) / Number(anthro.hip)).toFixed(2) : null;
+
+  const handleFieldVoiceInput = (setter: (val: any) => void) => {
+    const recognition = speechService.createRecognition({
+      onResult: (transcript) => {
+        const numericValue = parseFloat(transcript.replace(/[^0-9.]/g, ''));
+        if (!isNaN(numericValue)) {
+          setter(numericValue);
+        }
+      }
+    });
+    if (recognition) recognition.start();
+  };
 
   return (
     <div className="space-y-6 transition-none">
@@ -55,25 +77,45 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
         <ScoreCard title="Hydration & Perfusion" subtitle="General Assessment" icon={<Droplets size={20} />}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">JVP (mmHg)</label>
-                <input 
-                  type="number" 
-                  value={exam.jvp} 
-                  onChange={e => setExam({...exam, jvp: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
-                  placeholder="e.g. 7"
-                />
+              <div className="relative group/field">
+                <label htmlFor="jvp-input" className="text-[10px] font-black text-slate-600 uppercase block mb-1">JVP (mmHg)</label>
+                <div className="relative">
+                  <input 
+                    id="jvp-input"
+                    type="number" 
+                    value={exam.jvp} 
+                    onChange={e => setExam({...exam, jvp: e.target.value === '' ? '' : Number(e.target.value)})}
+                    className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary pr-8"
+                    placeholder="e.g. 7"
+                  />
+                  <button
+                    onClick={() => handleFieldVoiceInput((v) => setExam({...exam, jvp: v}))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors"
+                    title="Voice input for JVP"
+                  >
+                    <Mic size={14} />
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Capillary Refill (s)</label>
-                <input 
-                  type="number" 
-                  value={exam.capRefill} 
-                  onChange={e => setExam({...exam, capRefill: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
-                  placeholder="e.g. 2"
-                />
+              <div className="relative group/field">
+                <label htmlFor="cap-refill-input" className="text-[10px] font-black text-slate-600 uppercase block mb-1">Capillary Refill (s)</label>
+                <div className="relative">
+                  <input 
+                    id="cap-refill-input"
+                    type="number" 
+                    value={exam.capRefill} 
+                    onChange={e => setExam({...exam, capRefill: e.target.value === '' ? '' : Number(e.target.value)})}
+                    className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary pr-8"
+                    placeholder="e.g. 2"
+                  />
+                  <button
+                    onClick={() => handleFieldVoiceInput((v) => setExam({...exam, capRefill: v}))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors"
+                    title="Voice input for Capillary Refill"
+                  >
+                    <Mic size={14} />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -210,47 +252,87 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
         <ScoreCard title="Anthropometry" subtitle="Body Measurements" icon={<Ruler size={20} />}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Weight (kg)</label>
-                <input 
-                  type="number" 
-                  value={anthro.weight} 
-                  onChange={e => setAnthro({...anthro, weight: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
-                  placeholder="e.g. 70"
-                />
+              <div className="relative group/field">
+                <label htmlFor="weight-input" className="text-[10px] font-black text-slate-600 uppercase block mb-1">Weight (kg)</label>
+                <div className="relative">
+                  <input 
+                    id="weight-input"
+                    type="number" 
+                    value={anthro.weight} 
+                    onChange={e => setAnthro({...anthro, weight: e.target.value === '' ? '' : Number(e.target.value)})}
+                    className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary pr-8"
+                    placeholder="e.g. 70"
+                  />
+                  <button
+                    onClick={() => handleFieldVoiceInput((v) => setAnthro({...anthro, weight: v}))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors"
+                    title="Voice input for Weight"
+                  >
+                    <Mic size={14} />
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Height (cm)</label>
-                <input 
-                  type="number" 
-                  value={anthro.height} 
-                  onChange={e => setAnthro({...anthro, height: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
-                  placeholder="e.g. 175"
-                />
+              <div className="relative group/field">
+                <label htmlFor="height-input" className="text-[10px] font-black text-slate-600 uppercase block mb-1">Height (cm)</label>
+                <div className="relative">
+                  <input 
+                    id="height-input"
+                    type="number" 
+                    value={anthro.height} 
+                    onChange={e => setAnthro({...anthro, height: e.target.value === '' ? '' : Number(e.target.value)})}
+                    className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary pr-8"
+                    placeholder="e.g. 175"
+                  />
+                  <button
+                    onClick={() => handleFieldVoiceInput((v) => setAnthro({...anthro, height: v}))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors"
+                    title="Voice input for Height"
+                  >
+                    <Mic size={14} />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Waist (cm)</label>
-                <input 
-                  type="number" 
-                  value={anthro.waist} 
-                  onChange={e => setAnthro({...anthro, waist: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
-                  placeholder="e.g. 90"
-                />
+              <div className="relative group/field">
+                <label htmlFor="waist-input" className="text-[10px] font-black text-slate-600 uppercase block mb-1">Waist (cm)</label>
+                <div className="relative">
+                  <input 
+                    id="waist-input"
+                    type="number" 
+                    value={anthro.waist} 
+                    onChange={e => setAnthro({...anthro, waist: e.target.value === '' ? '' : Number(e.target.value)})}
+                    className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary pr-8"
+                    placeholder="e.g. 90"
+                  />
+                  <button
+                    onClick={() => handleFieldVoiceInput((v) => setAnthro({...anthro, waist: v}))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors"
+                    title="Voice input for Waist"
+                  >
+                    <Mic size={14} />
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">Hip (cm)</label>
-                <input 
-                  type="number" 
-                  value={anthro.hip} 
-                  onChange={e => setAnthro({...anthro, hip: e.target.value === '' ? '' : Number(e.target.value)})}
-                  className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary"
-                  placeholder="e.g. 100"
-                />
+              <div className="relative group/field">
+                <label htmlFor="hip-input" className="text-[10px] font-black text-slate-600 uppercase block mb-1">Hip (cm)</label>
+                <div className="relative">
+                  <input 
+                    id="hip-input"
+                    type="number" 
+                    value={anthro.hip} 
+                    onChange={e => setAnthro({...anthro, hip: e.target.value === '' ? '' : Number(e.target.value)})}
+                    className="w-full p-2 bg-white border border-border font-bold text-sm outline-none focus:border-primary pr-8"
+                    placeholder="e.g. 100"
+                  />
+                  <button
+                    onClick={() => handleFieldVoiceInput((v) => setAnthro({...anthro, hip: v}))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors"
+                    title="Voice input for Hip"
+                  >
+                    <Mic size={14} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -357,6 +439,127 @@ const PhysicalExam: React.FC<PhysicalExamProps> = ({
                     </div>
                 ))}
             </div>
+        </ScoreCard>
+
+        {/* Cognitive & Mental Health */}
+        <ScoreCard title="AMTS" subtitle="Abbreviated Mental Test Score" icon={<Brain size={20} />} score={ScoringEngine.calculateAMTS(amts)}>
+          <div className="space-y-2">
+            {[
+              { key: 'age', label: 'Age' },
+              { key: 'time', label: 'Time (nearest hour)' },
+              { key: 'address', label: 'Address (42 West Street)' },
+              { key: 'year', label: 'Year' },
+              { key: 'place', label: 'Place (hospital name)' },
+              { key: 'recognition', label: 'Recognition (2 persons)' },
+              { key: 'dob', label: 'Date of Birth' },
+              { key: 'monarch', label: 'Monarch / President' },
+              { key: 'ww2', label: 'Dates of WW2' },
+              { key: 'countBackwards', label: 'Count 20 to 1' }
+            ].map(item => (
+              <div key={item.key} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-border/50 hover:bg-muted/50 transition-colors">
+                <span className="font-medium text-foreground text-xs">{item.label}</span>
+                <select 
+                  value={amts[item.key as keyof typeof amts] ? 'correct' : 'incorrect'} 
+                  onChange={e => setAmts({...amts, [item.key]: e.target.value === 'correct'})}
+                  className="p-1.5 bg-card border border-border rounded-lg font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="incorrect">Incorrect</option>
+                  <option value="correct">Correct</option>
+                </select>
+              </div>
+            ))}
+            <div className="mt-4 p-3 bg-slate-100 rounded-lg border border-slate-200">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Interpretation</p>
+              <p className="text-xs font-bold text-slate-700">
+                {ScoringEngine.calculateAMTS(amts) <= 6 ? 'Suggestive of cognitive impairment' : 'Normal cognitive function'}
+              </p>
+            </div>
+          </div>
+        </ScoreCard>
+
+        <ScoreCard title="PHQ-9" subtitle="Depression Screening" icon={<Brain size={20} />} score={ScoringEngine.calculatePHQ9(phq9)}>
+          <div className="space-y-3">
+            {[
+              { key: 'q1', label: 'Little interest or pleasure in doing things' },
+              { key: 'q2', label: 'Feeling down, depressed, or hopeless' },
+              { key: 'q3', label: 'Trouble falling/staying asleep, or sleeping too much' },
+              { key: 'q4', label: 'Feeling tired or having little energy' },
+              { key: 'q5', label: 'Poor appetite or overeating' },
+              { key: 'q6', label: 'Feeling bad about yourself' },
+              { key: 'q7', label: 'Trouble concentrating on things' },
+              { key: 'q8', label: 'Moving or speaking slowly / being fidgety' },
+              { key: 'q9', label: 'Thoughts that you would be better off dead' }
+            ].map(item => (
+              <div key={item.key} className="space-y-1.5">
+                <p className="text-[10px] font-bold text-slate-600 uppercase leading-tight">{item.label}</p>
+                <div className="flex gap-1">
+                  {[0, 1, 2, 3].map(v => (
+                    <button 
+                      key={v} 
+                      onClick={() => setPhq9({...phq9, [item.key]: v})}
+                      className={`flex-1 py-1.5 border border-border text-[10px] font-bold transition-none ${phq9[item.key as keyof typeof phq9] === v ? 'bg-slate-400 text-white border-slate-500' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {v === 0 ? 'Not at all' : v === 1 ? 'Several days' : v === 2 ? 'More than half' : 'Nearly every day'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="mt-4 p-3 bg-slate-100 rounded-lg border border-slate-200">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Interpretation</p>
+              <p className="text-xs font-bold text-slate-700">
+                {(() => {
+                  const score = ScoringEngine.calculatePHQ9(phq9);
+                  if (score <= 4) return 'Minimal depression';
+                  if (score <= 9) return 'Mild depression';
+                  if (score <= 14) return 'Moderate depression';
+                  if (score <= 19) return 'Moderately severe depression';
+                  return 'Severe depression';
+                })()}
+              </p>
+            </div>
+          </div>
+        </ScoreCard>
+
+        <ScoreCard title="GAD-7" subtitle="Anxiety Screening" icon={<Brain size={20} />} score={ScoringEngine.calculateGAD7(gad7)}>
+          <div className="space-y-3">
+            {[
+              { key: 'q1', label: 'Feeling nervous, anxious or on edge' },
+              { key: 'q2', label: 'Not being able to stop or control worrying' },
+              { key: 'q3', label: 'Worrying too much about different things' },
+              { key: 'q4', label: 'Trouble relaxing' },
+              { key: 'q5', label: 'Being so restless that it is hard to sit still' },
+              { key: 'q6', label: 'Becoming easily annoyed or irritable' },
+              { key: 'q7', label: 'Feeling afraid as if something awful might happen' }
+            ].map(item => (
+              <div key={item.key} className="space-y-1.5">
+                <p className="text-[10px] font-bold text-slate-600 uppercase leading-tight">{item.label}</p>
+                <div className="flex gap-1">
+                  {[0, 1, 2, 3].map(v => (
+                    <button 
+                      key={v} 
+                      onClick={() => setGad7({...gad7, [item.key]: v})}
+                      className={`flex-1 py-1.5 border border-border text-[10px] font-bold transition-none ${gad7[item.key as keyof typeof gad7] === v ? 'bg-slate-400 text-white border-slate-500' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {v === 0 ? 'Not at all' : v === 1 ? 'Several days' : v === 2 ? 'More than half' : 'Nearly every day'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="mt-4 p-3 bg-slate-100 rounded-lg border border-slate-200">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Interpretation</p>
+              <p className="text-xs font-bold text-slate-700">
+                {(() => {
+                  const score = ScoringEngine.calculateGAD7(gad7);
+                  if (score <= 4) return 'Minimal anxiety';
+                  if (score <= 9) return 'Mild anxiety';
+                  if (score <= 14) return 'Moderate anxiety';
+                  return 'Severe anxiety';
+                })()}
+              </p>
+            </div>
+          </div>
         </ScoreCard>
       </div>
     </div>

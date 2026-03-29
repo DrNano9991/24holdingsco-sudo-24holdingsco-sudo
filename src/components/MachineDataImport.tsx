@@ -212,11 +212,14 @@ const MachineDataImport: React.FC<MachineDataImportProps> = ({ machineData, onAd
               </div>
 
               <div className="relative">
+                <label htmlFor="raw-text-input" className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Manual Text Input</label>
                 <textarea
+                  id="raw-text-input"
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="OR PASTE RAW MACHINE TEXT HERE..."
+                  placeholder="PASTE RAW MACHINE TEXT HERE (e.g. WBC: 12.5, Hgb: 14.2)..."
                   className="w-full h-32 p-3 bg-slate-50 border-2 border-slate-200 font-bold text-[10px] uppercase outline-none focus:border-slate-800 resize-none transition-none"
+                  aria-label="Raw machine text input"
                 />
               </div>
 

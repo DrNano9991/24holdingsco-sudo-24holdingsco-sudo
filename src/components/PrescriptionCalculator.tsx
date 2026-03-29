@@ -33,7 +33,20 @@ const MEDICATION_DATABASE: Medication[] = [
   { name: 'Amlodipine', category: 'Hypertension', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 5, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.2 },
   { name: 'Atorvastatin', category: 'Hyperlipidemia', standardDose: 0.2, defaultUnit: 'mg/kg', concentration: 10, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.5 },
   { name: 'Salbutamol Inhaler', category: 'Respiratory', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 0.1, formUnit: 'Puff', dosageForms: ['Inhalation'], warningThreshold: 0.3 },
-  // ... rest of database can be updated similarly if needed, but these cover the requested types
+  { name: 'Enalapril', category: 'Hypertension', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 5, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.4 },
+  { name: 'Losartan', category: 'Hypertension', standardDose: 0.7, defaultUnit: 'mg/kg', concentration: 50, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 1.5 },
+  { name: 'Nifedipine (Retard)', category: 'Hypertension', standardDose: 0.5, defaultUnit: 'mg/kg', concentration: 20, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 1.0 },
+  { name: 'Spironolactone', category: 'Diuretic', standardDose: 2, defaultUnit: 'mg/kg', concentration: 25, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 4 },
+  { name: 'Glibenclamide', category: 'Diabetes', standardDose: 0.1, defaultUnit: 'mg/kg', concentration: 5, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.3 },
+  { name: 'Insulin (Regular)', category: 'Diabetes', standardDose: 0.1, defaultUnit: 'U/kg', concentration: 100, formUnit: 'ml', dosageForms: ['SC', 'IV'], warningThreshold: 0.5 },
+  { name: 'Simvastatin', category: 'Hyperlipidemia', standardDose: 0.3, defaultUnit: 'mg/kg', concentration: 20, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.8 },
+  { name: 'Azithromycin', category: 'Antibiotic', standardDose: 10, defaultUnit: 'mg/kg', concentration: 250, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 15 },
+  { name: 'Ciprofloxacin', category: 'Antibiotic', standardDose: 15, defaultUnit: 'mg/kg', concentration: 500, formUnit: 'Tablet', dosageForms: ['Oral', 'IV'], warningThreshold: 20 },
+  { name: 'Metronidazole', category: 'Antibiotic', standardDose: 7.5, defaultUnit: 'mg/kg', concentration: 200, formUnit: 'Tablet', dosageForms: ['Oral', 'IV'], warningThreshold: 15 },
+  { name: 'Aspirin', category: 'Antiplatelet', standardDose: 1, defaultUnit: 'mg/kg', concentration: 75, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 5 },
+  { name: 'Warfarin', category: 'Anticoagulant', standardDose: 0.05, defaultUnit: 'mg/kg', concentration: 5, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 0.2 },
+  { name: 'Digoxin', category: 'Cardiac', standardDose: 0.01, defaultUnit: 'mg/kg', concentration: 0.25, formUnit: 'Tablet', dosageForms: ['Oral', 'IV'], warningThreshold: 0.02 },
+  { name: 'Prednisolone', category: 'Steroid', standardDose: 1, defaultUnit: 'mg/kg', concentration: 5, formUnit: 'Tablet', dosageForms: ['Oral'], warningThreshold: 2 },
 ];
 
 const DOSING_RATES = ['QD', 'BD', 'OD', 'TD', 'TID', 'QID'];
@@ -47,9 +60,10 @@ interface PrescriptionCalculatorProps {
 
 type PrescriptionResult = string;
 
-const SyringeMap: React.FC<{ volume: number }> = ({ volume }) => {
+const SyringeMap: React.FC<{ volume: number; isInjectable?: boolean }> = ({ volume, isInjectable }) => {
   // Determine syringe size based on volume
   const getSyringeSize = (vol: number) => {
+    if (isInjectable && vol <= 10) return 10; // User specifically requested 10ml visual for injectables
     if (vol <= 1) return 1;
     if (vol <= 2) return 2;
     if (vol <= 5) return 5;
@@ -60,29 +74,37 @@ const SyringeMap: React.FC<{ volume: number }> = ({ volume }) => {
   };
 
   // Calculate how many syringes are needed
-  const syringesNeeded = Math.ceil(volume / 60);
+  const syringesNeeded = Math.ceil(volume / 60) || 1;
   const volumes = [];
   let remainingVolume = volume;
   for (let i = 0; i < syringesNeeded; i++) {
     const currentVol = Math.min(remainingVolume, 60);
-    volumes.push(currentVol);
+    volumes.push(currentVol > 0 ? currentVol : 0);
     remainingVolume -= currentVol;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-2">
-          <Syringe className="text-primary" size={18} />
-          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Clinical Infusion Visualization</h4>
+          <div className="p-1.5 bg-primary/10 rounded-lg">
+            <Syringe className="text-primary" size={18} />
+          </div>
+          <div>
+            <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Dose Loading Visualization</h4>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Real-time Syringe Mapping</p>
+          </div>
         </div>
         <div className="text-right">
-          <p className="text-lg font-black text-primary leading-none">{volume.toFixed(2)} <span className="text-[10px]">ml</span></p>
-          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Total Volume Required</p>
+          <div className="flex items-baseline justify-end gap-1">
+            <span className="text-2xl font-black text-primary tracking-tighter tabular-nums">{volume.toFixed(2)}</span>
+            <span className="text-[10px] font-bold text-primary/60 uppercase">ml</span>
+          </div>
+          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Total Volume Loaded</p>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 justify-center p-6 bg-slate-50 border border-slate-200 rounded-xl shadow-inner overflow-x-auto">
+      <div className="flex flex-wrap gap-6 justify-center p-8 bg-gradient-to-b from-slate-50 to-slate-100/50 border border-slate-200 rounded-2xl shadow-inner overflow-x-auto min-h-[320px] items-end">
         {volumes.map((vol, idx) => {
           const syringeSize = getSyringeSize(vol);
           const fillPercentage = Math.min(100, (vol / syringeSize) * 100);
@@ -93,70 +115,93 @@ const SyringeMap: React.FC<{ volume: number }> = ({ volume }) => {
           }
 
           return (
-            <div key={idx} className="flex flex-col items-center">
-              <div className="relative w-16 h-64 flex flex-col items-center">
+            <div key={idx} className="flex flex-col items-center group/syringe">
+              <div className="relative w-20 h-72 flex flex-col items-center">
+                {/* Syringe Volume Label */}
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover/syringe:opacity-100 transition-opacity whitespace-nowrap">
+                  <span className="px-2 py-0.5 bg-slate-800 text-white text-[8px] font-black rounded uppercase tracking-widest">
+                    {syringeSize}ml Syringe
+                  </span>
+                </div>
+
                 {/* Syringe Body */}
-                <div className="relative w-12 h-56 border-2 border-slate-400 rounded-b-xl bg-gradient-to-r from-white/90 via-white/50 to-white/90 backdrop-blur-sm overflow-hidden shadow-lg">
-                  {/* Fluid with realistic gradient */}
+                <div className="relative w-14 h-60 border-2 border-slate-400/60 rounded-b-2xl bg-white/40 backdrop-blur-[2px] overflow-hidden shadow-[inset_0_0_15px_rgba(0,0,0,0.05)]">
+                  {/* Glass Reflection */}
+                  <div className="absolute top-0 left-2 w-1.5 h-full bg-white/30 z-40 pointer-events-none" />
+                  <div className="absolute top-0 right-3 w-0.5 h-full bg-white/20 z-40 pointer-events-none" />
+                  
+                  {/* Fluid with realistic gradient and animation */}
                   <div 
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-600/60 to-emerald-400/40 transition-all duration-700 ease-out z-10"
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-emerald-600/50 via-emerald-400/40 to-emerald-600/50 transition-all duration-1000 cubic-bezier(0.34, 1.56, 0.64, 1) z-10"
                     style={{ height: `${fillPercentage}%` }}
                   >
                     {/* Fluid highlight */}
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-white/30" />
+                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-white/40 shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
                     {/* Bubbles effect */}
-                    <div className="absolute top-2 left-2 w-1 h-1 bg-white/40 rounded-full animate-bounce" />
-                    <div className="absolute top-8 right-3 w-1.5 h-1.5 bg-white/30 rounded-full animate-pulse" />
+                    <div className="absolute top-4 left-3 w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse" />
+                    <div className="absolute top-12 right-4 w-1 h-1 bg-white/30 rounded-full animate-bounce" />
                   </div>
 
                   {/* Plunger Tip (Rubber Stopper) */}
                   <div 
-                    className="absolute left-0 right-0 h-6 transition-all duration-700 ease-out z-20"
-                    style={{ bottom: `calc(${fillPercentage}% - 4px)` }}
+                    className="absolute left-0 right-0 h-8 transition-all duration-1000 cubic-bezier(0.34, 1.56, 0.64, 1) z-20"
+                    style={{ bottom: `calc(${fillPercentage}% - 6px)` }}
                   >
-                    <div className="w-full h-2 bg-slate-800 rounded-t-sm" />
-                    <div className="w-full h-4 bg-slate-700" />
+                    <div className="w-full h-2.5 bg-slate-800 rounded-t-sm shadow-md" />
+                    <div className="w-full h-5 bg-gradient-to-b from-slate-700 to-slate-900" />
+                    {/* Stopper Rings */}
+                    <div className="absolute top-4 left-0 right-0 h-[1px] bg-slate-600/50" />
+                    <div className="absolute top-6 left-0 right-0 h-[1px] bg-slate-600/50" />
                   </div>
 
                   {/* Graduations */}
                   {graduations.map(v => (
                     <div 
                       key={v} 
-                      className="absolute left-0 right-0 flex items-center justify-between px-1 z-30"
+                      className="absolute left-0 right-0 flex items-center justify-between px-1.5 z-30"
                       style={{ bottom: `${(v / syringeSize) * 100}%` }}
                     >
-                      <div className={`h-[1px] ${v % 1 === 0 ? 'w-3 bg-slate-600' : 'w-1.5 bg-slate-400'}`} />
-                      <span className="text-[7px] font-black text-slate-500">{v}</span>
+                      <div className={`h-[1.5px] ${v % 1 === 0 ? 'w-4 bg-slate-700' : 'w-2 bg-slate-500'}`} />
+                      <span className={`text-[8px] font-black tabular-nums ${v % 1 === 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                        {v % 1 === 0 ? v : ''}
+                      </span>
                     </div>
                   ))}
                 </div>
 
-                {/* Needle Hub */}
-                <div className="w-4 h-4 bg-slate-400 rounded-t-sm -mt-0.5 shadow-sm" />
-                <div className="w-1 h-6 bg-slate-300 shadow-sm" />
+                {/* Needle Hub & Tip */}
+                <div className="w-5 h-5 bg-gradient-to-b from-slate-400 to-slate-500 rounded-t-md -mt-0.5 shadow-sm z-50" />
+                <div className="w-1.5 h-8 bg-gradient-to-r from-slate-300 via-slate-200 to-slate-300 shadow-sm z-50" />
 
                 {/* Plunger Handle (Top) */}
                 <div 
-                  className="absolute left-1/2 -translate-x-1/2 w-8 h-48 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 border-x-2 border-slate-300 z-[-1] transition-all duration-700 ease-out"
-                  style={{ bottom: `calc(${fillPercentage}% + 56px)` }}
+                  className="absolute left-1/2 -translate-x-1/2 w-10 h-56 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 border-x-2 border-slate-300/50 z-[-1] transition-all duration-1000 cubic-bezier(0.34, 1.56, 0.64, 1)"
+                  style={{ bottom: `calc(${fillPercentage}% + 64px)` }}
                 >
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-2 bg-slate-400 rounded-full shadow-sm" />
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-3 bg-gradient-to-b from-slate-300 to-slate-400 rounded-full shadow-md border border-slate-400/50" />
+                  {/* Plunger Ribs */}
+                  <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-slate-300/50" />
                 </div>
               </div>
-              <p className="mt-2 text-[9px] font-black text-slate-500 uppercase tracking-tighter">Syringe {idx + 1} ({vol.toFixed(1)}ml)</p>
+              <div className="mt-4 text-center">
+                <p className="text-[10px] font-black text-slate-800 tabular-nums">{vol.toFixed(2)}ml</p>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Syringe {idx + 1} ({syringeSize}ml)</p>
+              </div>
             </div>
           );
         })}
       </div>
       
       {volume > 60 && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-          <AlertTriangle size={16} className="text-amber-600 mt-0.5" />
+        <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-xl flex items-start gap-4 shadow-sm animate-pulse">
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <AlertTriangle size={20} className="text-amber-600" />
+          </div>
           <div>
-            <p className="text-[10px] font-black text-amber-800 uppercase tracking-tight">Large Volume Warning</p>
-            <p className="text-[9px] font-bold text-amber-700 uppercase tracking-widest mt-1">
+            <p className="text-[11px] font-black text-amber-800 uppercase tracking-tight">Large Volume Protocol Required</p>
+            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mt-1 leading-relaxed">
               Total volume ({volume.toFixed(2)}ml) exceeds standard syringe capacity. 
-              Dose must be divided into {syringesNeeded} separate syringes or administered via infusion pump.
+              Dose must be divided into {syringesNeeded} separate syringes or administered via calibrated infusion pump.
             </p>
           </div>
         </div>
@@ -253,6 +298,10 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
     return selectedMed.warningThreshold ? selectedMed.standardDose >= selectedMed.warningThreshold : false;
   }, [selectedMed]);
 
+  const isInjectableRoute = useMemo(() => {
+    return ['IV', 'IM', 'SC'].includes(selectedDosageForm);
+  }, [selectedDosageForm]);
+
   const generatePrescription = async () => {
     setIsGenerating(true);
     try {
@@ -309,15 +358,16 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
           <div className="lg:col-span-2 space-y-6">
             {/* Weight Input */}
             <div className="bg-white p-4 border border-border relative">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Patient Weight (kg)</label>
+              <label htmlFor="patient-weight" className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Patient Weight (kg)</label>
               <div className="flex items-center justify-between">
                 <input 
+                  id="patient-weight"
                   type="number" 
                   step="0.01"
                   value={weight}
                   onChange={(e) => setWeight(Number(e.target.value))}
                   className="text-3xl font-bold text-[#1A365D] bg-transparent border-none outline-none w-full"
-                  placeholder="0.00"
+                  placeholder="Enter weight in kg (e.g. 70.5)"
                 />
                 {onVoiceCommand && (
                   <button 
@@ -333,13 +383,15 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
 
             {/* Medication Search */}
             <div className="relative">
+              <label htmlFor="medication-search" className="sr-only">Search Medication</label>
               <div className="flex items-center gap-3 bg-white p-3 border border-border">
                 <Search size={18} className="text-slate-400" />
                 <input 
+                  id="medication-search"
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search Medication Database (e.g. Gentamicin)..."
+                  placeholder="Search Medication Database (e.g. Gentamicin, Amoxicillin)..."
                   className="flex-1 bg-transparent border-none outline-none font-bold text-sm text-slate-700"
                 />
               </div>
@@ -466,7 +518,12 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
 
           {/* Syringe Visual Aid */}
           <div className="space-y-6">
-            {selectedMed?.formUnit === 'ml' && <SyringeMap volume={calculatedQuantity} />}
+            {selectedMed?.formUnit === 'ml' && (
+              <SyringeMap 
+                volume={calculatedQuantity} 
+                isInjectable={isInjectableRoute} 
+              />
+            )}
             
             <div className="bg-white p-4 border border-border">
               <div className="flex items-center gap-2 mb-3">
@@ -507,11 +564,12 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ patient
         </div>
 
         <div className="space-y-2">
-          <label className="text-[11px] font-bold text-slate-600 uppercase block">Specific Clinical Indication / Notes</label>
+          <label htmlFor="clinical-indication" className="text-[11px] font-bold text-slate-600 uppercase block">Specific Clinical Indication / Notes</label>
           <textarea 
+            id="clinical-indication"
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
-            placeholder="e.g., Severe CAP, suspected sepsis, hypertensive emergency..."
+            placeholder="Enter clinical indication (e.g., Severe CAP, suspected sepsis, hypertensive emergency...)"
             className="w-full p-3 bg-white border border-border font-bold text-sm outline-none focus:border-primary min-h-[80px]"
           />
         </div>

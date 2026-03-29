@@ -87,6 +87,23 @@ export class SpeechService {
       'CXR': ' chest x-ray ',
       'ABG': ' arterial blood gas ',
       'CT': ' C-T ',
+      'CBC': ' C-B-C or Complete Blood Count ',
+      'LFT': ' L-F-T or Liver Function Test ',
+      'RFT': ' R-F-T or Renal Function Test ',
+      'U&E': ' U and E or Urea and Electrolytes ',
+      'FBC': ' F-B-C or Full Blood Count ',
+      'CRP': ' C-R-P or C-Reactive Protein ',
+      'ESR': ' E-S-R or Erythrocyte Sedimentation Rate ',
+      'INR': ' I-N-R or International Normalized Ratio ',
+      'VTE': ' V-T-E or Venous Thromboembolism ',
+      'CVD': ' C-V-D or Cardiovascular Disease ',
+      'T2DM': ' Type 2 Diabetes Mellitus ',
+      'CKD': ' C-K-D or Chronic Kidney Disease ',
+      'COPD': ' C-O-P-D or Chronic Obstructive Pulmonary Disease ',
+      'NSCLC': ' Non-Small Cell Lung Cancer ',
+      'IV/IM': ' intravenous or intramuscular ',
+      'MDI': ' metered dose inhaler ',
+      'DPI': ' dry powder inhaler ',
       'stat': ' immediately ',
       '\\+': ' plus ',
       '\\-': ' minus ',
@@ -133,10 +150,10 @@ export class SpeechService {
 
     // Adjust rate based on priority, but keep it natural
     if (priority === 'high') {
-      utterance.rate = 1.0;
+      utterance.rate = 1.1; // Slightly faster for urgency
       utterance.pitch = 1.0;
     } else if (priority === 'critical') {
-      utterance.rate = 1.1;
+      utterance.rate = 1.25; // Faster for critical urgency
       utterance.pitch = 1.05;
     } else {
       utterance.rate = 0.95; // Slightly slower for more "human" feel

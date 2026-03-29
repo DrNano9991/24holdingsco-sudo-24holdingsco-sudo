@@ -740,6 +740,9 @@ const App: React.FC = () => {
               chads={chads} setChads={setChads}
               curb65={curb65} setCurb65={setCurb65}
               wellsPE={wellsPE} setWellsPE={setWellsPE}
+              phq9={phq9} setPhq9={setPhq9}
+              gad7={gad7} setGad7={setGad7}
+              amts={amts} setAmts={setAmts}
               onVoiceCommand={handleVoiceCommand}
             />
           </div>

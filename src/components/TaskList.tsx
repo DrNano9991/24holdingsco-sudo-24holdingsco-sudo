@@ -222,24 +222,29 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, setTasks, patients }) => {
           </div>
           
           <div className="space-y-4">
-            <div className="flex gap-1 border border-border p-1 bg-slate-50">
-              <input 
-                type="text" 
-                value={newTask}
-                onChange={e => setNewTask(e.target.value)}
-                onKeyPress={e => e.key === 'Enter' && addTask()}
-                placeholder="Describe the task (e.g., Administer IV fluids)..."
-                className="flex-1 bg-white px-3 py-2 font-bold text-sm outline-none focus:bg-slate-50 transition-none text-slate-900 placeholder:text-slate-400"
-              />
-              <button onClick={addTask} className="bg-slate-800 text-white px-6 border-l border-border hover:bg-slate-700 transition-none font-bold text-xs uppercase tracking-widest">
-                Add
-              </button>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="new-task-input" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block ml-1">Task Description</label>
+              <div className="flex gap-1 border border-border p-1 bg-slate-50">
+                <input 
+                  id="new-task-input"
+                  type="text" 
+                  value={newTask}
+                  onChange={e => setNewTask(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && addTask()}
+                  placeholder="Describe the task (e.g., Administer IV fluids)..."
+                  className="flex-1 bg-white px-3 py-2 font-bold text-sm outline-none focus:bg-slate-50 transition-none text-slate-900 placeholder:text-slate-400"
+                />
+                <button onClick={addTask} className="bg-slate-800 text-white px-6 border-l border-border hover:bg-slate-700 transition-none font-bold text-xs uppercase tracking-widest">
+                  Add
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col md:flex-row items-center gap-3">
               <div className="flex-1 w-full">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1 ml-1">Link to Patient Case</label>
+                <label htmlFor="link-patient-select" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1 ml-1">Link to Patient Case</label>
                 <select 
+                  id="link-patient-select"
                   value={selectedPatientId}
                   onChange={e => setSelectedPatientId(e.target.value)}
                   className="w-full bg-white border border-border px-3 py-2 font-bold text-sm outline-none focus:border-primary transition-none text-slate-900"
@@ -251,8 +256,8 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, setTasks, patients }) => {
                 </select>
               </div>
               <div className="w-full md:w-48">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1 ml-1">Priority Level</label>
-                <div className="flex gap-1 p-1 bg-slate-50 border border-border">
+                <label id="priority-level-label" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1 ml-1">Priority Level</label>
+                <div className="flex gap-1 p-1 bg-slate-50 border border-border" aria-labelledby="priority-level-label">
                   {(['low', 'medium', 'high'] as const).map(p => (
                     <button
                       key={p}
@@ -284,8 +289,8 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, setTasks, patients }) => {
       {/* Task List Controls */}
       <div className="flex flex-col md:flex-row items-center gap-4">
         <div className="flex flex-col gap-1 w-full md:w-auto">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Status Filter</label>
-          <div className="flex gap-1 border border-border p-1 bg-slate-50">
+          <label htmlFor="status-filter-select" className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Status Filter</label>
+          <div id="status-filter-select" className="flex gap-1 border border-border p-1 bg-slate-50">
             {(['all', 'pending', 'executed'] as const).map(f => (
               <button
                 key={f}
@@ -303,8 +308,9 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, setTasks, patients }) => {
         </div>
 
         <div className="flex flex-col gap-1 w-full md:w-auto">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Filter</label>
+          <label htmlFor="patient-filter-select" className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Filter</label>
           <select 
+            id="patient-filter-select"
             value={patientFilter}
             onChange={e => setPatientFilter(e.target.value)}
             className="bg-white border border-border px-3 py-1.5 font-bold text-[10px] uppercase tracking-widest outline-none focus:border-primary transition-none text-slate-600"
@@ -317,8 +323,8 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, setTasks, patients }) => {
         </div>
 
         <div className="flex flex-col gap-1 w-full md:w-auto">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Priority Filter</label>
-          <div className="flex gap-1 border border-border p-1 bg-slate-50">
+          <label id="priority-filter-label" className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Priority Filter</label>
+          <div className="flex gap-1 border border-border p-1 bg-slate-50" aria-labelledby="priority-filter-label">
             {(['all', 'low', 'medium', 'high'] as const).map(p => (
               <button
                 key={p}

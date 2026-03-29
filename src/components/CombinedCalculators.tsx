@@ -3,7 +3,7 @@ import { GCSState, MEWSState, SIRSState, QSOFAState, PEWSState, AgeGroup, ExamSt
 import { GCS_OPTIONS } from '../constants';
 import ScoreCard from './ScoreCard';
 import Tooltip from './Tooltip';
-import { Brain, Activity, Zap, AlertTriangle, Baby, Info, User, Scissors, Thermometer, Droplets, Ruler, Calculator, Stethoscope, CheckCircle2 } from 'lucide-react';
+import { Brain, Activity, Zap, AlertTriangle, Baby, Info, User, Scissors, Thermometer, Droplets, Ruler, Calculator, Stethoscope, CheckCircle2, Mic } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScoringEngine } from '../services/scoringEngine';
 import { speechService } from '../services/speechService';
@@ -60,6 +60,18 @@ const CombinedCalculators: React.FC<Props> = ({
   };
 
   const ariscatRisk = getAriscatRisk(ariscatScore);
+  
+  const handleFieldVoiceInput = (setter: (val: any) => void) => {
+    const recognition = speechService.createRecognition({
+      onResult: (transcript) => {
+        const numericValue = parseFloat(transcript.replace(/[^0-9.]/g, ''));
+        if (!isNaN(numericValue)) {
+          setter(numericValue);
+        }
+      }
+    });
+    if (recognition) recognition.start();
+  };
 
   const isMewsCritical = ScoringEngine.calculateMEWS(mews) >= 5;
   const isPewsCritical = ScoringEngine.calculatePEWS(pews) >= 5;
@@ -316,7 +328,7 @@ const CombinedCalculators: React.FC<Props> = ({
                 ].map((field, i) => (
                   <div key={i} className="space-y-3 group">
                     <div className="flex items-center justify-between px-1">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{field.label}</label>
+                      <label htmlFor={`mews-input-${i}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{field.label}</label>
                       <div className="flex items-center gap-2">
                         {field.vitals.severity !== 'Normal' && (
                           <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
@@ -333,20 +345,31 @@ const CombinedCalculators: React.FC<Props> = ({
                         </button>
                       </div>
                     </div>
-                    <div className="relative">
+                    <div className="relative group/field">
                       <input 
+                        id={`mews-input-${i}`}
                         type="number" 
                         value={field.value} 
                         onChange={e => field.setter(Math.max(0, Math.min(field.max, Number(e.target.value))))}
-                        className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-16 ${
+                        placeholder={`Enter ${field.label}...`}
+                        className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-24 ${
                           field.vitals.severity === 'Critical' ? 'border-destructive/50 focus:border-destructive bg-destructive/5' : 
                           field.vitals.severity === 'Abnormal' ? 'border-warning/50 focus:border-warning bg-warning/5' : 
                           'border-transparent focus:border-primary focus:bg-card'
                         }`}
                       />
-                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">
-                        {field.unit}
-                      </span>
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                        <button
+                          onClick={() => handleFieldVoiceInput(field.setter)}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                          title={`Voice input for ${field.label}`}
+                        >
+                          <Mic size={20} />
+                        </button>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">
+                          {field.unit}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -410,31 +433,53 @@ const CombinedCalculators: React.FC<Props> = ({
             <div className="space-y-8 relative z-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('temperatureLabel')}</label>
-                  <div className="relative">
+                  <label htmlFor="sirs-temp" className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('temperatureLabel')}</label>
+                  <div className="relative group/field">
                     <input 
+                      id="sirs-temp"
                       type="number" 
                       value={sirs.temp} 
                       onChange={e => setSirs({...sirs, temp: e.target.value === '' ? '' : Number(e.target.value)})}
-                      className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-16 ${
+                      placeholder="Enter temperature (e.g. 37.0)"
+                      className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-24 ${
                         sirs.temp !== '' && (sirs.temp < 36 || sirs.temp > 38) ? 'border-warning/50 focus:border-warning bg-warning/5' : 'border-transparent focus:border-primary focus:bg-card'
                       }`}
                     />
-                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">°C</span>
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                      <button
+                        onClick={() => handleFieldVoiceInput((v) => setSirs({...sirs, temp: v}))}
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                        title="Voice input for Temperature"
+                      >
+                        <Mic size={20} />
+                      </button>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">°C</span>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('wbcCountLabel')}</label>
-                  <div className="relative">
+                  <label htmlFor="sirs-wbc" className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('wbcCountLabel')}</label>
+                  <div className="relative group/field">
                     <input 
+                      id="sirs-wbc"
                       type="number" 
                       value={sirs.wbc} 
                       onChange={e => setSirs({...sirs, wbc: e.target.value === '' ? '' : Number(e.target.value)})}
-                      className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-16 ${
+                      placeholder="Enter WBC count (e.g. 7.5)"
+                      className={`w-full p-5 bg-muted/30 rounded-2xl border-2 font-mono text-2xl font-bold outline-none transition-all pr-24 ${
                         sirs.wbc !== '' && (sirs.wbc < 4 || sirs.wbc > 12) ? 'border-warning/50 focus:border-warning bg-warning/5' : 'border-transparent focus:border-primary focus:bg-card'
                       }`}
                     />
-                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">10³/µL</span>
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                      <button
+                        onClick={() => handleFieldVoiceInput((v) => setSirs({...sirs, wbc: v}))}
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                        title="Voice input for WBC Count"
+                      >
+                        <Mic size={20} />
+                      </button>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">10³/µL</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -664,15 +709,26 @@ const CombinedCalculators: React.FC<Props> = ({
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Pre-op SpO2 (%)</label>
-                  <div className="relative">
+                  <label htmlFor="surgery-spo2" className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Pre-op SpO2 (%)</label>
+                  <div className="relative group/field">
                     <input 
+                      id="surgery-spo2"
                       type="number" 
                       value={surgery.preOpSpO2} 
                       onChange={e => setSurgery({...surgery, preOpSpO2: e.target.value === '' ? '' : Number(e.target.value)})}
-                      className="w-full p-5 bg-muted/30 rounded-2xl border-2 border-transparent font-mono text-2xl font-bold outline-none focus:border-primary focus:bg-card transition-all pr-16"
+                      placeholder="Enter SpO2 (e.g. 98)"
+                      className="w-full p-5 bg-muted/30 rounded-2xl border-2 border-transparent font-mono text-2xl font-bold outline-none focus:border-primary focus:bg-card transition-all pr-24"
                     />
-                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">%</span>
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                      <button
+                        onClick={() => handleFieldVoiceInput((v) => setSurgery({...surgery, preOpSpO2: v}))}
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                        title="Voice input for SpO2"
+                      >
+                        <Mic size={20} />
+                      </button>
+                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest pointer-events-none">%</span>
+                    </div>
                   </div>
                 </div>
               </div>

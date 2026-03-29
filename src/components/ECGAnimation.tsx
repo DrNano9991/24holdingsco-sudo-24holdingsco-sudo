@@ -26,13 +26,13 @@ interface ECGAnimationProps {
 const ECGAnimation: React.FC<ECGAnimationProps> = ({ rhythm, onRhythmChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const heartRef = useRef<HTMLDivElement>(null);
-  const stateIdxRef = useRef(0);
+  const [stateIdx, setStateIdx] = React.useState(0);
 
   // Sync internal state with prop
   useEffect(() => {
     if (rhythm) {
       const idx = CARDIAC_STATES.findIndex(s => s.mode === rhythm);
-      if (idx !== -1) stateIdxRef.current = idx;
+      if (idx !== -1) setStateIdx(idx);
     }
   }, [rhythm]);
 
@@ -66,7 +66,7 @@ const ECGAnimation: React.FC<ECGAnimationProps> = ({ rhythm, onRhythmChange }) =
         ctx.stroke();
       }
 
-      const state = CARDIAC_STATES[stateIdxRef.current];
+      const state = CARDIAC_STATES[stateIdx];
       let val = 100;
 
       // Adjust iteration speed based on rhythm
@@ -171,8 +171,8 @@ const ECGAnimation: React.FC<ECGAnimationProps> = ({ rhythm, onRhythmChange }) =
     let stateInterval: any;
     if (!rhythm) {
       stateInterval = setInterval(() => {
-        stateIdxRef.current = (stateIdxRef.current + 1) % CARDIAC_STATES.length;
-        if (onRhythmChange) onRhythmChange(CARDIAC_STATES[stateIdxRef.current].mode);
+        setStateIdx(prev => (prev + 1) % CARDIAC_STATES.length);
+        if (onRhythmChange) onRhythmChange(CARDIAC_STATES[(stateIdx + 1) % CARDIAC_STATES.length].mode);
       }, 10000);
     }
 
@@ -182,9 +182,9 @@ const ECGAnimation: React.FC<ECGAnimationProps> = ({ rhythm, onRhythmChange }) =
       cancelAnimationFrame(animationFrameId);
       if (stateInterval) clearInterval(stateInterval);
     };
-  }, [rhythm, onRhythmChange]);
+  }, [rhythm, onRhythmChange, stateIdx]);
 
-  const currentState = CARDIAC_STATES[stateIdxRef.current];
+  const currentState = CARDIAC_STATES[stateIdx];
 
   return (
     <div className="relative h-24 w-full bg-white border-2 border-slate-200 overflow-hidden flex items-center p-2 rounded-lg shadow-inner">
